@@ -1,0 +1,271 @@
+.camera-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: var(--accent);
+  margin-right: 8px;
+}
+.camera-pip:empty {
+  display: none;
+}
+.camera-pip {
+  position: absolute;
+  right: 22px;
+  bottom: 42px;
+  width: 23%;
+  max-width: 240px;
+  min-width: 100px;
+  border: 2px solid oklch(90% 0.005 70);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--stage);
+  box-shadow: 0 4px 16px oklch(10% 0.005 70 / 0.4);
+  pointer-events: none;
+}
+.camera-pip img {
+  display: block;
+  width: 100%;
+  max-height: 150px;
+  object-fit: contain;
+}
+.camera-pip > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 0.6rem;
+  padding: 3px;
+  color: oklch(93% 0.005 70);
+}
+.export-camera-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 4px;
+  font-size: 0.75rem;
+}
+.export-camera-toggle input {
+  min-height: 0;
+}
+.camera-consent {
+  margin: 14px 0;
+  padding: 18px;
+  border: 1px solid var(--selected-border);
+  background: var(--selected);
+  border-radius: 10px;
+}
+.camera-consent > p {
+  font-size: 0.78rem;
+  line-height: 1.8;
+  margin-top: 8px;
+  color: var(--text);
+}
+.camera-consent > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.break-banner {
+  background: var(--selected);
+  border-color: var(--selected-border);
+}
+.break-banner small {
+  display: block;
+  font-size: 0.72rem;
+  margin-top: 3px;
+}
+.wallet-line {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 28px 0;
+}
+.wallet-icon {
+  color: var(--accent);
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  background: var(--selected);
+  border-radius: 14px;
+}
+.wallet-line > div > strong {
+  font-size: 1.65rem;
+  letter-spacing: -0.03em;
+}
+.wallet-line > div > strong > small {
+  font-size: 0.83rem;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.wallet-line p {
+  font-size: 0.72rem;
+}
+.next-reward {
+  margin-left: auto;
+  font-size: 0.73rem;
+  text-align: right;
+  color: var(--muted);
+}
+.next-reward strong {
+  color: var(--text);
+}
+.earning-form {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 18px 0;
+}
+.earning-form label {
+  font-size: 0.83rem;
+}
+.earning-form input {
+  width: 80px;
+  margin: 0 8px;
+}
+.earning-form button {
+  font-size: 0.75rem;
+}
+.reward-list {
+  margin-top: 12px;
+}
+.reward-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+}
+.reward-description {
+  flex: 1;
+  min-width: 100px;
+}
+.reward-description strong {
+  display: block;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+.reward-description small {
+  font-size: 0.72rem;
+}
+.reward-progress {
+  width: 116px;
+  margin: 0 8px;
+}
+.reward-progress progress {
+  width: 100%;
+  height: 5px;
+  accent-color: var(--accent);
+}
+.reward-progress small {
+  display: block;
+  font-size: 0.65rem;
+  text-align: right;
+}
+.reward-row > button {
+  font-size: 0.73rem;
+}
+.reward-editor {
+  padding: 20px;
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.reward-editor .export-fields {
+  align-items: flex-end;
+}
+.reward-editor .export-fields label {
+  min-width: 100px;
+}
+.reward-editor .export-fields label:first-child {
+  flex: 2;
+  min-width: 200px;
+}
+.reward-editor input {
+  min-width: 0;
+  width: 100%;
+}
+.reward-history {
+  margin-top: 28px;
+}
+.reward-history > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+  font-size: 0.75rem;
+}
+.reward-history h2 {
+  margin-bottom: 12px;
+}
+.rewards-page > .hint {
+  margin: 24px 0;
+}
+.rewards-page {
+  padding-bottom: 24px;
+}
+@media (max-width: 1050px) {
+  .camera-status {
+    font-size: 0.63rem;
+    margin: 0;
+  }
+  .reward-row {
+    flex-wrap: wrap;
+  }
+  .reward-progress {
+    width: 90px;
+  }
+  .reward-row .icon-button {
+    width: 30px;
+    padding: 5px;
+  }
+  .next-reward {
+    max-width: 180px;
+  }
+  .wallet-line {
+    gap: 10px;
+  }
+  .camera-consent > div {
+    flex-wrap: wrap;
+  }
+}
+.pause-menu {
+  margin-top: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.pause-menu .section-title p {
+  font-size: 0.75rem;
+  margin-top: 5px;
+}
+.pause-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.pause-presets > button {
+  min-width: 68px;
+}
+.pause-custom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pause-custom label {
+  font-size: 0.8rem;
+}
+.pause-custom input {
+  width: 78px;
+  margin: 0 8px;
+}
+.pause-custom button {
+  font-size: 0.75rem;
+}

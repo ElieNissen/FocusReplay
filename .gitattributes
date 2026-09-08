@@ -1,0 +1,11 @@
+* text=auto
+*.cjs text eol=lf
+*.mjs text eol=lf
+*.jsx text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.md text eol=lf
+*.ps1 text eol=crlf
+*.png binary
+*.ico binary
+licenses/* -whitespace

@@ -1,0 +1,54 @@
+const { contextBridge, ipcRenderer } = require('electron');
+const methods = [
+  'state',
+  'screens',
+  'start',
+  'pause',
+  'pauseFor',
+  'stop',
+  'settings',
+  'pickMusic',
+  'removeMusic',
+  'deleteSession',
+  'deleteFrame',
+  'export',
+  'cancelExport',
+  'openExport',
+  'openData',
+  'showMain',
+  'allowCamera',
+  'cameraFrame',
+  'saveReward',
+  'deleteReward',
+  'redeemReward',
+  'finishBreak',
+];
+const api = Object.fromEntries(
+  methods.map((method) => [method, (...args) => ipcRenderer.invoke('focus:' + method, ...args)]),
+);
+api.onChange = (callback) => {
+  const listener = (_, data) => callback(data);
+  ipcRenderer.on('focus:change', listener);
+  return () => ipcRenderer.removeListener('focus:change', listener);
+};
+api.onExport = (callback) => {
+  const listener = (_, data) => callback(data);
+  ipcRenderer.on('focus:export', listener);
+  return () => ipcRenderer.removeListener('focus:export', listener);
+};
+api.onCameraRequest = (callback) => {
+  const listener = (_, id) => callback(id);
+  ipcRenderer.on('focus:camera-request', listener);
+  return () => ipcRenderer.removeListener('focus:camera-request', listener);
+};
+api.onCameraStop = (callback) => {
+  const listener = () => callback();
+  ipcRenderer.on('focus:camera-stop', listener);
+  return () => ipcRenderer.removeListener('focus:camera-stop', listener);
+};
+api.onBreakEnded = (callback) => {
+  const listener = (_, data) => callback(data);
+  ipcRenderer.on('focus:break-ended', listener);
+  return () => ipcRenderer.removeListener('focus:break-ended', listener);
+};
+contextBridge.exposeInMainWorld('focusReplay', Object.freeze(api));
