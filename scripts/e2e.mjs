@@ -87,6 +87,20 @@ const activity = frames.map((f) => ({
   app: f.app,
   category: f.category,
 }));
+const briefStart = activity[10].from;
+activity.splice(
+  10,
+  1,
+  { from: briefStart, to: briefStart + 2000, ms: 2000, app: 'Terminal', category: 'work' },
+  { from: briefStart + 2000, to: briefStart + 4000, ms: 2000, app: 'Firefox', category: 'unknown' },
+  {
+    from: briefStart + 4000,
+    to: briefStart + 60000,
+    ms: 56000,
+    app: 'Visual Studio Code',
+    category: 'work',
+  },
+);
 await fs.writeFile(
   path.join(profile, 'state.json'),
   JSON.stringify({
@@ -135,14 +149,24 @@ try {
   await expect(page.getByRole('heading', { name: 'Votre journée', exact: true })).toBeVisible();
   await expect(page.locator('.filmstrip img').first()).toBeVisible();
   await page.locator('.image-surface img').evaluate((img) => img.decode());
+  await expect(page.locator('.software-callout').filter({ hasText: 'Terminal' })).toBeVisible();
+  await expect(page.locator('.software-callout').filter({ hasText: 'Firefox' })).toBeVisible();
   await page.screenshot({ path: path.join(root, 'replay-dark.png'), fullPage: true });
   await page.getByRole('slider', { name: 'Curseur de la timeline' }).fill(String(frames[5].at));
   await expect(page.locator('.timestamp span')).toHaveText('6 / 24');
   await page.getByRole('button', { name: 'Capture suivante', exact: true }).click();
   await expect(page.locator('.timestamp span')).toHaveText('7 / 24');
-  await page.getByRole('button', { name: 'Lire le replay', exact: true }).click();
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('button', { name: 'Arrêter la lecture', exact: true })).toBeVisible();
   await expect(page.locator('.timestamp span')).not.toHaveText('7 / 24');
   await page.getByRole('button', { name: 'Arrêter la lecture', exact: true }).click();
+  await page.getByRole('slider', { name: 'Vitesse de lecture' }).fill('3');
+  await page.locator('.timeline-scroll').hover();
+  await page.mouse.wheel(0, -180);
+  await expect
+    .poll(() => page.getByRole('slider', { name: 'Zoom de la timeline' }).inputValue().then(Number))
+    .toBeGreaterThan(1);
+  await page.getByRole('slider', { name: 'Zoom de la timeline' }).fill('1');
   await page.getByRole('button', { name: 'Passer au thème clair' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await page.waitForTimeout(250);
@@ -285,7 +309,7 @@ try {
   await page.screenshot({ path: path.join(root, 'rewards.png'), fullPage: true });
   await page.getByRole('button', { name: 'Retour au replay', exact: true }).click();
   await page.getByRole('button', { name: 'Exporter en MP4', exact: true }).click();
-  await page.getByRole('button', { name: 'Créer le MP4', exact: true }).click();
+
   await expect(page.getByText('Vidéo prête : replay.mp4')).toBeVisible({ timeout: 90000 });
   const mp4 = await fs.stat(path.join(root, 'replay.mp4'));
   expect(mp4.size).toBeGreaterThan(1000);
@@ -315,7 +339,7 @@ try {
     '1',
     path.join(root, 'export-camera-frame.png'),
   ]);
-  await page.getByRole('button', { name: 'Fermer l’export', exact: true }).click();
+
   await page.getByRole('button', { name: 'Passer au thème sombre' }).click();
   await page.waitForTimeout(250);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(920, 760));

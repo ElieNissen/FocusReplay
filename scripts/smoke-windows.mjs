@@ -70,7 +70,11 @@ try {
     .toBe(false);
   await page.getByRole('button', { name: 'Terminer', exact: true }).click();
   const exported = path.join(root, 'private-smoke.mp4');
-  await app.evaluate(({ dialog }, target) => {
+  await app.evaluate(({ dialog, shell }, target) => {
+    global.__revealedExport = null;
+    shell.showItemInFolder = (file) => {
+      global.__revealedExport = file;
+    };
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: target });
   }, exported);
   await page.evaluate(() =>
@@ -83,6 +87,7 @@ try {
     )
     .toBe('done');
   expect((await fs.stat(exported)).size).toBeGreaterThan(1000);
+  expect(await app.evaluate(() => global.__revealedExport)).toBe(exported);
   await app.close();
   app = null;
   // Real desktop samples are private test data, not visual evidence or deliverables.

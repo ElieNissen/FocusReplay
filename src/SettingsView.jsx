@@ -37,7 +37,6 @@ export default function SettingsView({
     <label className="setting-row">
       <span>
         <strong>{label}</strong>
-        {hint && <small>{hint}</small>}
       </span>
       <select
         value={settings[key]}
@@ -58,7 +57,6 @@ export default function SettingsView({
     <label className="setting-row">
       <span>
         <strong>{label}</strong>
-        <small>{hint}</small>
       </span>
       <Toggle
         className="toggle"
@@ -76,9 +74,7 @@ export default function SettingsView({
       </button>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">À VOTRE RYTHME</div>
           <h1>Réglages</h1>
-          <p>Une fois réglé, il ne reste qu’à commencer.</p>
         </div>
       </div>
       <section className="settings-section">
@@ -133,11 +129,6 @@ export default function SettingsView({
           ],
           'Si le plafond est atteint, les captures les plus anciennes partent en premier.',
         )}
-        <p className="hint">
-          Le nettoyage se fait au lancement et chaque minute lorsque l’application est ouverte.
-          Réduire ces limites peut supprimer des captures immédiatement. Les exports MP4 sont
-          conservés séparément.
-        </p>
       </section>
       <section className="settings-section">
         <h2>
@@ -185,12 +176,6 @@ export default function SettingsView({
             </div>
           </div>
         )}
-        <p className="hint">
-          Utilise la caméra par défaut de Windows. Vous pouvez désactiver cette option à tout
-          moment. Les photos servent à la revue visuelle ; il n’y a pas de reconnaissance faciale. «
-          Inactivité » décrit l’absence d’interaction clavier/souris, pas une absence certaine du
-          bureau.
-        </p>
       </section>
       <section className="settings-section">
         <h2>
@@ -254,9 +239,6 @@ export default function SettingsView({
             onKeyUp={(e) => save('volume', Number(e.target.value))}
           />
         </label>
-        <p className="hint">
-          Spotify n’est pas connecté dans cette version. Le MP3 fonctionne sans réseau.
-        </p>
       </section>
       <section className="settings-section">
         <h2>
@@ -283,13 +265,33 @@ export default function SettingsView({
           'Afficher la mini-barre flottante',
           'Une présence discrète, déplaçable, avec la durée et le bouton Pause.',
         )}
-        <p className="hint">
-          Code et bureautique : travail probable. Jeux et certains services de divertissement :
-          distraction probable. YouTube, messageries et usages non reconnus : indéterminés.
-          Inactivité après 5 minutes sans interaction, ce qui peut aussi correspondre à de la
-          lecture.
-        </p>
       </section>
+      <details className="classification-settings">
+        <summary>Classement des logiciels</summary>
+        {[...new Set(data.sessions.flatMap((s) => s.activity.map((a) => a.app)))]
+          .filter((name) => !name.startsWith('Inactivité'))
+          .sort()
+          .map((name) => (
+            <label className="setting-row" key={name}>
+              <span>{name}</span>
+              <select
+                aria-label={'Classement de ' + name}
+                value={settings.appRules?.[name.toLowerCase()] || 'auto'}
+                onChange={(e) => {
+                  const rules = { ...settings.appRules };
+                  if (e.target.value === 'auto') delete rules[name.toLowerCase()];
+                  else rules[name.toLowerCase()] = e.target.value;
+                  save('appRules', rules);
+                }}
+              >
+                <option value="auto">Automatique</option>
+                <option value="work">Travail</option>
+                <option value="distraction">Loisir</option>
+                <option value="unknown">Indéterminé</option>
+              </select>
+            </label>
+          ))}
+      </details>
       <section className="settings-section">
         <h2>
           <Sun size={19} /> Apparence
@@ -314,10 +316,6 @@ export default function SettingsView({
             <FolderOpen size={16} /> Ouvrir le dossier local
           </button>
         </div>
-        <p className="hint">
-          Fermer la fenêtre réduit l’application dans la barre Windows. Pour arrêter complètement :
-          icône FocusReplay → Quitter. Les fichiers locaux ne sont pas chiffrés par l’application.
-        </p>
       </section>
     </div>
   );

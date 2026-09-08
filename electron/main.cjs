@@ -22,6 +22,7 @@ const { randomUUID } = require('node:crypto');
 const { Recorder, selectFrames } = require('./core.cjs');
 const { startTracker } = require('./tracker.cjs');
 const { exportVideo } = require('./export.cjs');
+const { exportName } = require('./export-overlay.cjs');
 
 const testMode = !app.isPackaged && process.env.FOCUS_E2E === '1';
 const devUrl =
@@ -319,8 +320,14 @@ function exportChanged(value) {
   send('focus:export', value);
 }
 async function beginExport(options = {}) {
+  options = { fps: 2, height: 1080, ...options };
   if (exportJob) throw new Error('Un export est déjà en cours.');
-  if (![1, 2, 4, 8].includes(options.fps) || ![720, 1080].includes(options.height))
+  if (
+    !Number.isInteger(options.fps) ||
+    options.fps < 1 ||
+    options.fps > 8 ||
+    ![720, 1080].includes(options.height)
+  )
     throw new Error('Réglages d’export invalides.');
   if (options.day && !/^\d{4}-\d{2}-\d{2}$/.test(options.day)) throw new Error('Date invalide.');
   for (const key of ['from', 'to'])
@@ -329,7 +336,10 @@ async function beginExport(options = {}) {
   const controller = new AbortController();
   exportJob = controller;
   let frames = [];
+  let activity = [];
   try {
+    const previewFrames = selectFrames(recorder.data.sessions, options);
+    if (!previewFrames.length) throw new Error('Aucune capture dans cette sélection.');
     const selected =
       testMode && process.env.FOCUS_TEST_EXPORT
         ? { filePath: process.env.FOCUS_TEST_EXPORT }
@@ -337,7 +347,7 @@ async function beginExport(options = {}) {
             title: 'Exporter le replay',
             defaultPath: path.join(
               app.getPath('videos'),
-              `FocusReplay-${options.day || new Date().toISOString().slice(0, 10)}.mp4`,
+              exportName(previewFrames, Boolean(options.sessionId)),
             ),
             filters: [{ name: 'Vidéo MP4', extensions: ['mp4'] }],
           });
@@ -357,6 +367,16 @@ async function beginExport(options = {}) {
       throw new Error('Choisissez un dossier hors des données temporaires de FocusReplay.');
     await recorder.run(async () => {
       frames = selectFrames(recorder.data.sessions, options);
+      const sessionIds = new Set(frames.map((f) => f.sessionId));
+      activity = recorder.data.sessions
+        .filter((s) => sessionIds.has(s.id))
+        .flatMap((s) => s.activity)
+        .filter(
+          (a) =>
+            a.to >= frames[0]?.at &&
+            (!options.day || new Date(a.from).toLocaleDateString('en-CA') === options.day),
+        )
+        .map((a) => ({ ...a }));
       for (const f of frames) recorder.pins.add(f.id);
     });
     if (!frames.length) throw new Error('Aucune capture dans cette sélection.');
@@ -367,6 +387,7 @@ async function beginExport(options = {}) {
     );
     exportCompletion = exportVideo({
       frames,
+      activity,
       framePath: (id) => recorder.framePath(id),
       cameraPath: (id) => recorder.cameraPath(id),
       includeCamera: options.includeCamera !== false,
@@ -379,9 +400,10 @@ async function beginExport(options = {}) {
       onProgress: (progress) =>
         exportChanged({ status: 'running', progress, count: frames.length }),
     })
-      .then(() =>
-        exportChanged({ status: 'done', progress: 100, name: path.basename(target), target }),
-      )
+      .then(() => {
+        exportChanged({ status: 'done', progress: 100, name: path.basename(target), target });
+        if (!testMode) shell.showItemInFolder(target);
+      })
       .catch((e) =>
         exportChanged({
           status: controller.signal.aborted ? 'cancelled' : 'error',

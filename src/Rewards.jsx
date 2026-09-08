@@ -48,9 +48,7 @@ export function Rewards({ data, clock, act, busy, onBack }) {
       </button>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">DU TRAVAIL, PUIS DU TEMPS POUR SOI</div>
           <h1>Pauses & récompenses</h1>
-          <p>Vos règles, vos petits rendez-vous. Aucune série à entretenir.</p>
         </div>
       </div>
       <label className="setting-row">
@@ -113,7 +111,6 @@ export function Rewards({ data, clock, act, busy, onBack }) {
         <label className="setting-row">
           <span>
             <strong>Temps qui donne des points</strong>
-            <small>Le temps est estimé automatiquement, sans journal à remplir.</small>
           </span>
           <select
             aria-label="Temps qui donne des points"
@@ -124,11 +121,6 @@ export function Rewards({ data, clock, act, busy, onBack }) {
             <option value="active">Toute activité hors inactivité</option>
           </select>
         </label>
-        <p className="hint">
-          Le mode « travail probable » peut manquer du travail dans un navigateur. Le second mode
-          compte aussi les loisirs : choisissez ce qui convient à vos habitudes. Changer le taux ne
-          modifie pas les points déjà gagnés.
-        </p>
       </section>
       <section className="reward-section">
         <div className="section-title">
@@ -188,9 +180,7 @@ export function Rewards({ data, clock, act, busy, onBack }) {
             </div>
           ))}
         </div>
-        {!wallet.rewards.length && (
-          <p className="hint">Ajoutez une première pause ou récompense avec le bouton Ajouter.</p>
-        )}
+
         {redeem && (
           <div className="notice">
             <span>
@@ -308,11 +298,6 @@ export function Rewards({ data, clock, act, busy, onBack }) {
             ))}
         </section>
       )}
-      <p className="hint">
-        Le solde reste disponible lorsque les anciennes captures sont supprimées. Les 50 dernières
-        récompenses sont conservées localement. Une pause commencée consomme ses points, même si
-        vous la terminez plus tôt.
-      </p>
     </div>
   );
 }

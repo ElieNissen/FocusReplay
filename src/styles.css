@@ -1288,3 +1288,136 @@ strong {
 .playhead {
   bottom: 3px;
 }
+
+/* Compact editor: the content supplies the structure. */
+.page-heading {
+  margin: 18px 0;
+}
+.page-heading h1 {
+  font-size: 1.25rem;
+}
+.sidebar .start-button {
+  margin-top: 28px;
+}
+.local-note {
+  border: 0;
+  padding-top: 6px;
+  justify-content: flex-end;
+}
+.timeline-section {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+.timeline-toolbar {
+  justify-content: flex-end;
+  margin-bottom: 5px;
+}
+.timeline-scroll {
+  padding: 7px 2px 10px;
+}
+.timeline-inner {
+  min-width: 0;
+}
+.filmstrip {
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+}
+.filmstrip img {
+  border: 0;
+}
+.software-lane {
+  overflow: visible;
+  background: transparent;
+}
+.software-segment {
+  font-size: 0.7rem;
+  border: 0;
+}
+.software-callout {
+  position: absolute;
+  min-height: 24px;
+  height: 24px;
+  border: 0;
+  background: var(--bg);
+  padding: 1px 5px;
+  justify-content: flex-start;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  z-index: 2;
+}
+.software-callout small {
+  color: var(--muted);
+  margin-left: auto;
+}
+.software-callout i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.label-leader {
+  position: absolute;
+  top: 24px;
+  border-left: 1px dashed var(--muted);
+  pointer-events: none;
+}
+.inline-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.inline-slider input {
+  width: 105px;
+  height: 20px;
+  padding: 0;
+  accent-color: var(--accent);
+  cursor: ew-resize;
+}
+.inline-slider output {
+  font-size: 0.7rem;
+  min-width: 48px;
+  color: var(--muted);
+}
+.zoom-control button {
+  border: 0;
+  padding: 4px;
+  min-height: 26px;
+  background: transparent;
+}
+.transport {
+  display: flex;
+  justify-content: space-between;
+}
+.insights {
+  border: 0;
+  padding-top: 10px;
+}
+.archive-actions {
+  border: 0;
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+.camera-pip {
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: 0 3px 12px #0003;
+  bottom: 34px;
+}
+.camera-pip img {
+  height: auto;
+  max-height: none;
+  object-fit: initial;
+}
+.settings-section {
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  padding: 12px 0;
+}
+.app-stat {
+  grid-template-columns: minmax(95px, 1fr) 64px 58px 36px;
+}

@@ -2,6 +2,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { EventEmitter } = require('node:events');
+const { classify } = require('./tracker.cjs');
 
 const DEFAULTS = Object.freeze({
   interval: 60,
@@ -22,6 +23,7 @@ const DEFAULTS = Object.freeze({
   rewardsEnabled: false,
   pointsPerHour: 60,
   earnMode: 'work',
+  appRules: {},
 });
 const DEFAULT_REWARDS = [
   { id: 'stretch', name: 'Se lever et souffler', minutes: 5, cost: 25 },
@@ -71,7 +73,26 @@ function validateSettings(input, previous = DEFAULTS) {
     pointsPerHour: [1, 1000],
   };
   for (const [key, value] of Object.entries(input || {})) {
-    if (key in bounds) {
+    if (key === 'appRules') {
+      if (
+        !value ||
+        Array.isArray(value) ||
+        typeof value !== 'object' ||
+        Object.keys(value).length > 200
+      )
+        throw new Error('Règles invalides');
+      s.appRules = Object.fromEntries(
+        Object.entries(value).map(([app, category]) => {
+          if (
+            !app.trim() ||
+            app.length > 100 ||
+            !['work', 'distraction', 'unknown'].includes(category)
+          )
+            throw new Error('Règle invalide');
+          return [app.toLowerCase(), category];
+        }),
+      );
+    } else if (key in bounds) {
       if (
         typeof value !== 'number' ||
         !Number.isFinite(value) ||
@@ -164,6 +185,7 @@ class Recorder extends EventEmitter {
         );
     }
     this.data.wallet ||= newWallet();
+    this.applyRules();
     this.data.pauseTimer = null;
     for (const s of this.data.sessions)
       if (!s.endedAt) {
@@ -305,9 +327,23 @@ class Recorder extends EventEmitter {
       this.changed();
     });
   }
+  categoryFor(app, detected = 'unknown') {
+    if (detected === 'idle') return 'idle';
+    const key = String(app || '').toLowerCase();
+    const rules = this.data.settings.appRules || {};
+    return Object.hasOwn(rules, key) ? rules[key] : classify(app, detected);
+  }
+  applyRules() {
+    for (const session of this.data.sessions)
+      for (const item of [...session.activity, ...session.frames]) {
+        item.detectedCategory ??= item.category || 'unknown';
+        item.category = this.categoryFor(item.app, item.detectedCategory);
+      }
+  }
   async settings(input) {
     return this.run(async () => {
       this.data.settings = validateSettings(input, this.data.settings);
+      this.applyRules();
       this.nextCapture = Math.min(
         this.nextCapture,
         this.now() + this.data.settings.interval * 1000,
@@ -345,8 +381,9 @@ class Recorder extends EventEmitter {
       const activity = this.activity();
       const app = typeof activity === 'string' ? activity : activity?.app;
       this.trackingAvailable = Boolean(app);
-      const category =
+      const detectedCategory =
         typeof activity === 'object' && activity ? activity.category || 'unknown' : 'unknown';
+      const category = this.categoryFor(app, detectedCategory);
       if (s && s.status === 'recording' && !this.systemPaused) {
         const name = this.idle() >= 300 ? 'Inactivité (5 min+)' : app;
         if (name && elapsed) {
@@ -356,6 +393,7 @@ class Recorder extends EventEmitter {
             last &&
             last.app === name &&
             last.category === cat &&
+            last.detectedCategory === (this.idle() >= 300 ? 'idle' : detectedCategory) &&
             at - last.to < 6000 &&
             dayKey(last.from) === dayKey(at)
           ) {
@@ -365,6 +403,7 @@ class Recorder extends EventEmitter {
             s.activity.push({
               app: String(name).slice(0, 100),
               category: cat,
+              detectedCategory: this.idle() >= 300 ? 'idle' : detectedCategory,
               from: at - elapsed,
               to: at,
               ms: elapsed,
@@ -419,6 +458,7 @@ class Recorder extends EventEmitter {
               interval: this.data.settings.interval,
               app: name || 'Logiciel non identifié',
               category: this.idle() >= 300 ? 'idle' : category,
+              detectedCategory: this.idle() >= 300 ? 'idle' : detectedCategory,
               display,
               width,
               height,

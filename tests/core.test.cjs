@@ -182,7 +182,7 @@ test('subtitle labels escape ASS commands and include exact timestamps and inter
   );
   assert.match(text, /0:00:00.25/);
   assert.match(text, /Après une interruption/);
-  assert.doesNotMatch(text, /\\b1/);
+  assert.doesNotMatch(text, /\{\\b1\}/);
 });
 test('timeline lookup holds last known frame and clamps edges', async () => {
   const { frameAt, summarize } = await import('../src/lib.mjs');
@@ -328,4 +328,51 @@ test('indefinite pauses have no alarm and invalid durations are rejected', async
   assert.equal(n, 0);
   assert.equal(f.r.data.pauseTimer.endsAt, null);
   assert.equal(f.r.active.status, 'paused');
+});
+
+test('app rules reclassify history without losing automatic detection or changing earned points', async (t) => {
+  const { r, advance } = await fixture(t);
+  await r.start();
+  advance(2000);
+  await r.tick();
+  const earned = r.data.wallet.earned;
+  await r.settings({ appRules: { Editor: 'distraction' } });
+  assert.equal(r.active.frames[0].category, 'distraction');
+  assert.equal(r.active.activity[0].category, 'distraction');
+  await r.settings({ appRules: {} });
+  assert.equal(r.active.frames[0].category, 'work');
+  assert.equal(r.data.wallet.earned, earned);
+  await assert.rejects(() => r.settings({ appRules: { Editor: 'bogus' } }));
+  assert.equal(classify('Cursor'), 'work');
+  assert.equal(classify('Visual Studio Code'), 'work');
+});
+test('short software labels stack without overlapping and retain complete names', async () => {
+  const { placeLabels } = await import('../src/timeline-layout.mjs');
+  const segments = ['Editor', 'Browser', 'Terminal'].map((app, i) => ({
+    app,
+    x: 200 + i * 2,
+    width: 2,
+    ms: 2000,
+  }));
+  const result = placeLabels(segments, 1000);
+  assert.equal(result.rows, 3);
+  assert.equal(new Set(result.items.map((a) => a.row)).size, 3);
+  assert.ok(result.items.every((a) => a.labelWidth >= 115));
+});
+test('video names and graphic overlay preserve actual software transitions', () => {
+  const { exportName } = require('../electron/export-overlay.cjs');
+  const at = new Date(2026, 8, 8, 9, 15).getTime();
+  const frames = [
+    { at, app: 'Editor', category: 'work' },
+    { at: at + 60000, app: 'Browser', category: 'unknown' },
+  ];
+  assert.match(exportName(frames, true), /Session du 2026-09-08 - 09h15 a 09h16.mp4/);
+  const overlay = makeSubtitles(frames, 2, [
+    { from: at, to: at + 30000, ms: 30000, app: 'Editor', category: 'work' },
+    { from: at + 30000, to: at + 60000, ms: 30000, app: 'Browser', category: 'unknown' },
+  ]);
+  assert.match(overlay, /\\move\(/);
+  assert.match(overlay, /Travail/);
+  assert.match(overlay, /Browser/);
+  assert.match(overlay, /0:00:00.25/);
 });

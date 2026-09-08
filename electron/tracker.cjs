@@ -22,7 +22,11 @@ const NAMES = {
 };
 function classify(name, hint = 'unknown') {
   if (['work', 'distraction'].includes(hint)) return hint;
-  if (/^(Code|Codex|WINWORD|EXCEL|POWERPNT|figma|notion|devenv|idea64|pycharm64)$/i.test(name))
+  if (
+    /^(Code|Visual Studio Code|Codex|Cursor|Windsurf|WINWORD|Microsoft Word|EXCEL|Microsoft Excel|POWERPNT|PowerPoint|figma|notion|obsidian|devenv|idea64|pycharm64|webstorm64|rider64|blender|photoshop|illustrator|afterfx|resolve|WindowsTerminal|powershell|pwsh|Acrobat|AcroRd32|soffice|swriter|scalc)$/i.test(
+      name,
+    )
+  )
     return 'work';
   if (/^(steam|EpicGamesLauncher|Battle\.net|vlc|Netflix|TikTok)$/i.test(name))
     return 'distraction';

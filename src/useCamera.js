@@ -62,8 +62,9 @@ export function useCamera(data, widget) {
         if (!enabledRef.current || generation !== resources.current.generation)
           throw new Error('Camera disabled');
         const canvas = document.createElement('canvas');
-        canvas.width = Math.min(640, bitmap.width);
-        canvas.height = Math.min(640, Math.round((canvas.width * bitmap.height) / bitmap.width));
+        const scale = Math.min(1, 640 / bitmap.width, 640 / bitmap.height);
+        canvas.width = Math.round(bitmap.width * scale);
+        canvas.height = Math.round(bitmap.height * scale);
         canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
         await window.focusReplay.cameraFrame({
           requestId,

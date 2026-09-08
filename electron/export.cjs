@@ -3,50 +3,10 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 
-function assTime(seconds) {
-  const c = Math.round(seconds * 100);
-  return `${Math.floor(c / 360000)}:${String(Math.floor(c / 6000) % 60).padStart(2, '0')}:${String(Math.floor(c / 100) % 60).padStart(2, '0')}.${String(c % 100).padStart(2, '0')}`;
-}
-function safeText(text) {
-  return String(text)
-    .replace(/[\\{}\r\n]/g, ' ')
-    .slice(0, 240);
-}
-function makeSubtitles(frames, fps) {
-  const header =
-    '[Script Info]\nScriptType: v4.00+\nPlayResX: 1920\nPlayResY: 1080\n[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Default,Arial,28,&H00F4F1ED,&H00F4F1ED,&H00302C29,&H00302C29,0,0,0,0,100,100,0,0,1,0,0,7,32,32,24,1\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n';
-  return (
-    header +
-    frames
-      .map((f, i) => {
-        const d = new Date(f.at);
-        const stamp = d.toLocaleString('fr-FR', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-        });
-        const previous = frames[i - 1];
-        const paused =
-          previous &&
-          (f.sessionId !== previous.sessionId ||
-            f.at - previous.at > (previous.interval || 60) * 1800 ||
-            (f.events || []).some(
-              (e) =>
-                ['pause', 'system-pause', 'capture-error'].includes(e.type) &&
-                e.at > previous.at &&
-                e.at <= f.at,
-            ));
-        const text = `FocusReplay   |   ${stamp}   |   ${safeText(f.app)}${paused ? '   |   Après une interruption' : ''}`;
-        return `Dialogue: 0,${assTime(i / fps)},${assTime((i + 1) / fps)},Default,,0,0,0,,${text}`;
-      })
-      .join('\n')
-  );
-}
+const { makeSubtitles, safeText } = require('./export-overlay.cjs');
 async function exportVideo({
   frames,
+  activity = [],
   framePath,
   cameraPath,
   includeCamera = true,
@@ -89,10 +49,10 @@ async function exportVideo({
     }
     list += `file '${String(frames.length - 1).padStart(6, '0')}.jpg'\n`;
     await fs.writeFile(path.join(jobDir, 'frames.txt'), list);
-    await fs.writeFile(path.join(jobDir, 'labels.ass'), makeSubtitles(frames, fps));
+    await fs.writeFile(path.join(jobDir, 'labels.ass'), makeSubtitles(frames, fps, activity));
     const width = height === 720 ? 1280 : 1920;
     const screenFilter =
-      'scale=1920:992:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:88+(992-ih)/2:color=0x211f1d,setsar=1';
+      'scale=1920:740:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:100+(740-ih)/2:color=0x1b1c1c,setsar=1';
     const finishFilter = `subtitles=labels.ass,scale=${width}:${height},format=yuv420p`;
     const args = [
       '-hide_banner',
@@ -118,7 +78,7 @@ async function exportVideo({
       });
       // Missing webcam samples must never show a stale picture from another instant.
       const enable = ranges.map((r) => `gte(t,${r.start / fps})*lt(t,${r.end / fps})`).join('+');
-      const graph = `[0:v]${screenFilter}[screen];[1:v]scale=384:216:force_original_aspect_ratio=decrease,pad=392:224:(ow-iw)/2:(oh-ih)/2:color=0xf3ece4,setsar=1[cam];[screen][cam]overlay=W-w-32:H-h-32:enable='${enable}'[pip];[pip]${finishFilter}[out]`;
+      const graph = `[0:v]${screenFilter}[screen];[1:v]scale=384:256:force_original_aspect_ratio=decrease,setsar=1[cam];[screen][cam]overlay=W-w-32:840-h-16:enable='${enable}'[pip];[pip]${finishFilter}[out]`;
       await fs.writeFile(path.join(jobDir, 'filters.txt'), graph);
       args.push(
         '-f',

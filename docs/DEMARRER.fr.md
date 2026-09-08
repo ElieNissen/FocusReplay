@@ -2,7 +2,7 @@
 
 ## Premier essai avec votre vraie journée
 
-1. Ouvrez `FocusReplay-0.1.0-Windows.exe`. Aucune installation ni connexion n’est nécessaire. Cette première version n’est pas signée : Windows peut afficher un avertissement sur l’éditeur.
+1. Ouvrez `FocusReplay-0.2.0-Windows.exe`. Aucune installation ni connexion n’est nécessaire. Cette première version n’est pas signée : Windows peut afficher un avertissement sur l’éditeur.
 2. Cliquez sur **Commencer une session**. L’application capture réellement l’écran sélectionné et relève le logiciel au premier plan. Aucun objectif ou commentaire à remplir.
 3. Pour un premier essai rapide, choisissez **10 secondes** entre les captures dans **Réglages**. Vous pourrez ensuite revenir à **1 minute**, le réglage par défaut.
 4. Passez quelques instants dans deux logiciels, puis revenez dans FocusReplay. Glissez le curseur de la timeline : l’image change immédiatement. La piste des logiciels et le récapitulatif montrent les durées observées.
@@ -21,7 +21,7 @@ Choisissez votre propre MP3 pour la musique de démarrage. Réglez son volume et
 
 ## Exporter et conserver
 
-**Exporter en MP4** propose la journée entière, une session ou une plage sélectionnée. Choisissez la résolution et le nombre d’images par seconde, puis le fichier de destination. Les heures et les noms de logiciels sont inclus. Vous pouvez retirer la caméra de l’export.
+**Exporter en MP4** exporte directement la journée ou la session affichée, à la vitesse du curseur de lecture. Choisissez simplement le fichier de destination. Le MP4 contient une heure lisible, les logiciels et leurs durées, les catégories et une timeline animée. La caméra est incluse lorsqu’une photo est disponible. L’Explorateur sélectionne automatiquement la vidéo terminée.
 
 Les captures sont conservées **3 jours**, avec un plafond de **1 Go** par défaut. Les plus anciennes sont supprimées lorsque ces limites sont atteintes. Ces deux limites sont modifiables. Les vidéos exportées restent dans le dossier que vous avez choisi, indépendamment du nettoyage.
 
@@ -38,3 +38,7 @@ Les durées et catégories sont des estimations : un logiciel ou une période sa
 Dans le dossier du projet, lancez `npm run dev`. Les changements de l’interface et des couleurs apparaissent immédiatement. Les changements du moteur sauvegardent et terminent la session en cours avant de relancer l’application. Les données de développement sont séparées de celles de votre usage normal.
 
 La structure des modules et la procédure de vérification sont expliquées dans `CONTRIBUTING.md`. Pour une nouvelle version autonome, utilisez `npm run dist`. Fermez complètement l’ancienne version avant de remplacer l’exécutable ; les données locales restent conservées.
+
+**Raccourcis :** Espace lance ou arrête la lecture ; les flèches passent d’une capture à l’autre ; la molette sur la timeline zoome ou dézoome. Les curseurs horizontaux règlent la vitesse et le zoom. Les passages courts dans un logiciel restent lisibles grâce aux étiquettes décalées.
+
+**Classement :** les outils de code, bureautique et création reconnus comptent comme travail probable ; certains loisirs comme distraction probable. Les usages ambigus restent indéterminés. Dans Réglages → Classement des logiciels, une règle facultative par logiciel corrige aussi l’historique, sans annotations de session ni recalcul des points déjà gagnés.

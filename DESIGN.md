@@ -10,6 +10,8 @@ A person at their desk briefly reviews a session in daylight, then returns to wo
 
 ## Visual direction artifact
 
+Version 0.2 removes instructional headings, explanatory footers and redundant containers. The filmstrip starts compact and grows with available captures; short software segments use staggered labels and dotted leaders. Mouse-wheel zoom and horizontal speed/zoom sliders replace menus. Export is one action using the visible day/session and current playback speed. The video has a large clock, software context and a moving graphical timeline. Camera images retain their aspect ratio with no added light frame.
+
 A generated editor mock established the light sidebar, dark stage, orange playhead and lower filmstrip. Carry those ingredients into semantic React components. Omit the mock's mandatory goals, manual categorization sidebar, accent side-stripes and fictitious sample sessions. No rasterized interface text.
 
 ## Tokens

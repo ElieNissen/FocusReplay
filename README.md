@@ -9,12 +9,12 @@
 - **One-click sessions:** automatic names, start/pause/resume/stop, tray controls and an optional floating mini-bar.
 - **Real pauses:** 2, 5, 10 or 15 minutes, a custom duration, or an indefinite pause. Timed pauses end with a chime and notification; recording only resumes when you ask. Ending a session cancels its pause alarm.
 - **Two independent records:** screenshots every 10 seconds to 10 minutes; foreground application estimates every 2 seconds.
-- **Interactive replay:** drag the timeline for immediate preview, step with the arrow keys, press Space to play, zoom the timeline or screenshot, and review while recording continues.
+- **Interactive replay:** drag the timeline for immediate preview, step with the arrow keys, press Space to play, use the mouse wheel to zoom the timeline and drag sliders for 1–8× zoom or 1–8 images/second, and review while recording continues.
 - **Application timeline:** labeled segments link software usage to the nearest preceding screenshot. The summary shows application durations and percentages of observed time.
 - **Automatic, cautious categories:** work probable, distraction probable, unknown and idle. Browser hints are processed locally without retaining raw window titles. No AI service or productivity score.
 - **Gentle reminders:** configurable session reminders and optional probable-distraction nudges.
 - **Start music:** import your own MP3, choose the volume and a 15/30/60-second intro or the complete track. No Spotify integration in this version.
-- **MP4 export:** a day, a session or a marked range, with timestamps and software names; 720p/1080p and 1/2/4/8 captured images per second.
+- **MP4 export:** one click exports the selected day or session in 1080p, at the current playback speed. Large timestamps, software names/durations, category bands and a moving timeline show the context. Explorer reveals the finished video.
 - **Bounded storage:** compressed JPEGs, 3-day retention and 1 GB capture cap by default.
 - **Dark and light themes**, plus Windows theme preference.
 - **Optional camera photos:** off by default, explicit in-app consent, no microphone. A camera photo accompanies each screenshot and appears in picture-in-picture during replay and optionally in the MP4. Camera access stops during pauses, locking and session end.
@@ -46,7 +46,7 @@ For music and capture options, open **Réglages**. Reducing retention or the cap
 npm run dist
 ```
 
-The build is written to `release/FocusReplay-0.1.0-Windows.exe`. It is unsigned; Windows may show a publisher warning. Signing and a public binary release are not configured. The encoder's third-party notices and source-distribution requirements are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The build is written to `release/FocusReplay-0.2.0-Windows.exe`. It is unsigned; Windows may show a publisher warning. Signing and a public binary release are not configured. The encoder's third-party notices and source-distribution requirements are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## What the numbers mean
 
@@ -88,3 +88,5 @@ Architecture: Electron main process owns capture, lifecycle and filesystem acces
 ## License
 
 Original FocusReplay code: [MIT](LICENSE). Dependencies and the separate FFmpeg encoder retain their own licenses.
+
+Application classification can be adjusted once per software in **Réglages → Classement des logiciels**. Rules apply to existing observations and future captures; reverting to Automatic restores original detection. Previously earned points are unchanged.

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import SettingsView from './SettingsView';
+import Timeline from './Timeline';
 import {
   Play,
   Pause,
@@ -72,26 +73,20 @@ export default function App() {
     [timelineZoom, setTimelineZoom] = useState(1),
     [imageZoom, setImageZoom] = useState(1);
   const [clock, setClock] = useState(Date.now()),
-    [exportOpen, setExportOpen] = useState(false),
     [exportState, setExportState] = useState(null),
     [confirmDelete, setConfirmDelete] = useState(null),
     [loadedImage, setLoadedImage] = useState(''),
     [brokenImage, setBrokenImage] = useState('');
-  const [exportScope, setExportScope] = useState('day'),
-    [exportHeight, setExportHeight] = useState(1080),
-    [exportFps, setExportFps] = useState(4),
-    [rangeStart, setRangeStart] = useState(null),
-    [rangeEnd, setRangeEnd] = useState(null);
+
   const [musicPlaying, setMusicPlaying] = useState(false);
   const audio = useRef(null),
     musicTimer = useRef(null),
     musicSession = useRef(undefined),
-    timeline = useRef(null),
     stage = useRef(null),
     latest = useRef({});
   const widget = location.hash === '#widget';
   const cameraStatus = useCamera(data, widget);
-  const [includeCamera, setIncludeCamera] = useState(true);
+
   const [pauseMenu, setPauseMenu] = useState(false),
     [pauseMinutes, setPauseMinutes] = useState(5);
   const act = async (fn) => {
@@ -215,12 +210,11 @@ export default function App() {
   const index = current ? frames.findIndex((f) => f.id === current.id) : -1;
   const start = frames.length ? Math.min(frames[0].at, segments[0]?.from ?? frames[0].at) : 0;
   const end = Math.max(start + 1, frames.at(-1)?.at || 0, ...segments.map((a) => a.to));
-  const span = Math.max(end - start, 1),
-    playheadTime = follow
-      ? end
-      : cursor === null
-        ? current?.at || start
-        : Math.max(start, Math.min(end, cursor));
+  const playheadTime = follow
+    ? end
+    : cursor === null
+      ? current?.at || start
+      : Math.max(start, Math.min(end, cursor));
   const seek = (at) => {
     setFollow(false);
     setCursor(Number(at));
@@ -236,7 +230,7 @@ export default function App() {
     if (index === frames.length - 1) setCursor(frames[0].at);
     setPlaying((p) => !p);
   };
-  latest.current = { frames, index, step, togglePlay, view, exportOpen };
+  latest.current = { frames, index, step, togglePlay, view };
   useEffect(() => {
     if (!playing) return;
     const id = setInterval(() => {
@@ -249,7 +243,9 @@ export default function App() {
   useEffect(() => {
     const handler = (e) => {
       if (
-        ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'AUDIO'].includes(e.target.tagName) ||
+        e.target.isContentEditable ||
+        ['TEXTAREA', 'SELECT', 'AUDIO'].includes(e.target.tagName) ||
+        (e.target.tagName === 'INPUT' && e.target.type !== 'range') ||
         e.ctrlKey ||
         e.altKey ||
         e.metaKey ||
@@ -260,6 +256,7 @@ export default function App() {
         e.preventDefault();
         latest.current.togglePlay();
       }
+      if (e.target.tagName === 'INPUT') return;
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
         latest.current.step(-1);
@@ -293,8 +290,6 @@ export default function App() {
     setCursor(null);
     setFollow(false);
     setPlaying(false);
-    setRangeStart(null);
-    setRangeEnd(null);
     setConfirmDelete(null);
     setView('replay');
   };
@@ -332,11 +327,8 @@ export default function App() {
         <IconButton icon={Maximize} label="Ouvrir FocusReplay" onClick={() => api.showMain()} />
       </div>
     );
-  const filmFrames = frames.filter(
-    (_f, i) => i % Math.max(1, Math.floor(frames.length / (12 * timelineZoom))) === 0,
-  );
   const statusText = !active
-    ? 'Prêt quand vous l’êtes'
+    ? 'Prêt'
     : paused
       ? data.systemPaused
         ? 'Suspendu par Windows'
@@ -352,9 +344,7 @@ export default function App() {
             <Clapperboard size={21} />
           </span>
           <strong>FocusReplay</strong>
-          <span className="version">01</span>
         </div>
-        <p className="brand-caption">Votre journée, en perspective.</p>
         <button
           className="start-button"
           onClick={
@@ -370,7 +360,6 @@ export default function App() {
           {active ? <Radio size={17} /> : <Play size={17} fill="currentColor" />}
           {active ? 'Session en cours' : 'Commencer une session'}
         </button>
-        <div className="sidebar-label">VOTRE HISTORIQUE</div>
         <label className="date-field">
           <Clock3 size={16} />
           <input
@@ -411,9 +400,7 @@ export default function App() {
               {s.status === 'interrupted' && <small>Interrompue, captures récupérées</small>}
             </button>
           ))}
-          {!sessions.length && (
-            <p className="sidebar-empty">Les sessions de cette journée apparaîtront ici.</p>
-          )}
+          {!sessions.length && <span />}
         </nav>
         <footer className="sidebar-footer">
           <button
@@ -435,8 +422,6 @@ export default function App() {
             <Settings size={17} /> Réglages
           </button>
           <div className="local-note">
-            <ShieldCheck size={15} />
-            <span>Sur ce PC uniquement</span>
             <IconButton
               icon={settings.theme === 'dark' ? Sun : Moon}
               label={settings.theme === 'dark' ? 'Passer au thème clair' : 'Passer au thème sombre'}
@@ -599,7 +584,6 @@ export default function App() {
           <>
             <div className="page-heading">
               <div>
-                <div className="eyebrow">REVOIR, COMPRENDRE, RECOMMENCER</div>
                 <h1>
                   {selected
                     ? sessionName(selected)
@@ -610,105 +594,24 @@ export default function App() {
                           month: 'long',
                         })}
                 </h1>
-                <p>
-                  {frames.length
-                    ? `${frames.length} capture${frames.length === 1 ? '' : 's'} · Glissez dans la frise pour remonter le temps.`
-                    : 'Un clic pour commencer. Rien à remplir.'}
-                </p>
               </div>
               <button
-                disabled={!frames.length}
-                onClick={() => {
-                  setExportOpen((p) => !p);
-                  setExportScope(selectedSession ? 'session' : 'day');
-                }}
+                disabled={!frames.length || exportState?.status === 'running' || busy}
+                onClick={() =>
+                  act(() =>
+                    api.export({
+                      day,
+                      sessionId: selectedSession || undefined,
+                      fps: speed,
+                      height: 1080,
+                      includeCamera: true,
+                    }),
+                  )
+                }
               >
                 <Download size={17} /> Exporter en MP4
               </button>
             </div>
-            {exportOpen && (
-              <section className="export-panel" aria-label="Options d’export">
-                <div className="section-title">
-                  <h2>Garder une trace</h2>
-                  <IconButton
-                    icon={X}
-                    label="Fermer l’export"
-                    onClick={() => setExportOpen(false)}
-                  />
-                </div>
-                <div className="export-fields">
-                  <label>
-                    Contenu
-                    <select value={exportScope} onChange={(e) => setExportScope(e.target.value)}>
-                      <option value="day">Toute la journée</option>
-                      {selectedSession && <option value="session">Cette session</option>}
-                      <option value="range" disabled={!rangeStart || !rangeEnd}>
-                        Plage marquée dans la frise
-                      </option>
-                    </select>
-                  </label>
-                  <label>
-                    Défilement
-                    <select
-                      value={exportFps}
-                      onChange={(e) => setExportFps(Number(e.target.value))}
-                    >
-                      {[1, 2, 4, 8].map((n) => (
-                        <option key={n} value={n}>
-                          {n} images / seconde
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Résolution
-                    <select
-                      value={exportHeight}
-                      onChange={(e) => setExportHeight(Number(e.target.value))}
-                    >
-                      <option value={1080}>1080p</option>
-                      <option value={720}>720p · plus léger</option>
-                    </select>
-                  </label>
-                  <button
-                    className="primary"
-                    disabled={exportState?.status === 'running' || busy}
-                    onClick={() =>
-                      act(() =>
-                        api.export({
-                          day,
-                          sessionId:
-                            exportScope === 'session' ||
-                            (exportScope === 'range' && selectedSession)
-                              ? selectedSession
-                              : undefined,
-                          from:
-                            exportScope === 'range' ? Math.min(rangeStart, rangeEnd) : undefined,
-                          to: exportScope === 'range' ? Math.max(rangeStart, rangeEnd) : undefined,
-                          fps: exportFps,
-                          height: exportHeight,
-                          includeCamera,
-                        }),
-                      )
-                    }
-                  >
-                    <Download size={16} /> Créer le MP4
-                  </button>
-                </div>
-                <label className="export-camera-toggle">
-                  <input
-                    type="checkbox"
-                    checked={includeCamera}
-                    onChange={(e) => setIncludeCamera(e.target.checked)}
-                  />{' '}
-                  Inclure les photos caméra disponibles, en incrustation
-                </label>
-                <p className="hint">
-                  Captures et heures exactes, sans audio. Le MP4 reste dans le dossier choisi, même
-                  après le nettoyage des captures.
-                </p>
-              </section>
-            )}
             {exportState && (
               <div
                 className={`notice export-notice ${exportState.status === 'error' ? 'error' : ''}`}
@@ -745,33 +648,12 @@ export default function App() {
                   <span />
                   <span />
                 </div>
-                <h2>
-                  {active && (!selectedSession || selectedSession === active.id)
-                    ? 'La session a commencé.'
-                    : 'À quoi ressemble votre temps ?'}
-                </h2>
-                <p>
-                  {active && (!selectedSession || selectedSession === active.id)
-                    ? 'Les captures apparaissent ici automatiquement. Vous pouvez continuer à travailler.'
-                    : 'Lancez une session, puis travaillez comme d’habitude. Retrouvez les captures et les logiciels utilisés au même endroit.'}
-                </p>
+                <p>{active ? 'Première capture…' : 'Aucune capture'}</p>
                 {!active && (
                   <button className="primary large" onClick={begin} disabled={busy}>
                     <Play size={17} fill="currentColor" /> Commencer
                   </button>
                 )}
-                <div className="empty-notes">
-                  <span>
-                    <Monitor size={16} /> Une capture toutes les {settings.interval} s
-                  </span>
-                  <span>
-                    <ShieldCheck size={16} /> Conservation : {settings.retentionDays} jours
-                  </span>
-                </div>
-                <p className="hint">
-                  Le suivi est visible dans la barre Windows. Pause et arrêt sont toujours
-                  accessibles.
-                </p>
               </section>
             ) : (
               <>
@@ -833,9 +715,6 @@ export default function App() {
                           src={`focusmedia://camera/${current.id}`}
                           alt={`Photo caméra à ${time(current.cameraAt || current.at)}`}
                         />
-                        <span>
-                          <Camera size={12} /> {time(current.cameraAt || current.at)}
-                        </span>
                       </>
                     )}
                   </div>
@@ -843,9 +722,6 @@ export default function App() {
                     <span>
                       <Monitor size={14} />
                       {current.app}
-                    </span>
-                    <span>
-                      {current.display} · {current.width} × {current.height}
                     </span>
                   </div>
                 </section>
@@ -880,191 +756,45 @@ export default function App() {
                       disabled={index === frames.length - 1}
                       onClick={() => step(1)}
                     />
-                    <select
-                      aria-label="Vitesse de lecture"
-                      value={speed}
-                      onChange={(e) => setSpeed(Number(e.target.value))}
-                    >
-                      {[1, 2, 4, 8].map((n) => (
-                        <option value={n} key={n}>
-                          {n} img/s
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    className={follow ? 'selected' : ''}
-                    onClick={() => {
-                      setFollow(true);
-                      setPlaying(false);
-                    }}
-                  >
-                    <Radio size={15} /> Dernière capture
-                  </button>
-                </div>
-                <section className="timeline-section" aria-label="Timeline interactive">
-                  <div className="timeline-toolbar">
-                    <span className="eyebrow">LE FIL DE VOTRE SESSION</span>
-                    <div className="timeline-tools">
-                      <label>
-                        Zoom{' '}
-                        <select
-                          aria-label="Zoom de la timeline"
-                          value={timelineZoom}
-                          onChange={(e) => setTimelineZoom(Number(e.target.value))}
-                        >
-                          {[1, 2, 4, 8].map((z) => (
-                            <option key={z} value={z}>
-                              {z}×
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <button
-                        className={rangeStart ? 'selected' : ''}
-                        onClick={() => setRangeStart(current.at)}
-                        title="Marquer le début de l’export"
-                      >
-                        Début{rangeStart ? ` ${shortTime(rangeStart)}` : ''}
-                      </button>
-                      <button
-                        className={rangeEnd ? 'selected' : ''}
-                        onClick={() => setRangeEnd(current.at)}
-                        title="Marquer la fin de l’export"
-                      >
-                        Fin{rangeEnd ? ` ${shortTime(rangeEnd)}` : ''}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="timeline-scroll" ref={timeline}>
-                    <div className="timeline-inner" style={{ width: `${timelineZoom * 100}%` }}>
-                      <div className="ruler">
-                        {Array.from({ length: 7 }, (_, i) => (
-                          <span key={i}>{shortTime(start + (span * i) / 6)}</span>
-                        ))}
-                      </div>
-                      <div className="filmstrip">
-                        {filmFrames.map((f) => (
-                          <img
-                            key={f.id}
-                            src={imageUrl(f)}
-                            alt=""
-                            loading="lazy"
-                            draggable="false"
-                            style={{ left: `${((f.at - start) / span) * 100}%` }}
-                          />
-                        ))}
-                      </div>
-                      <div className="activity-track" aria-hidden="true">
-                        {segments.map((a, i) => (
-                          <span
-                            key={i}
-                            className={a.category || 'unknown'}
-                            style={{
-                              left: `${Math.max(0, ((a.from - start) / span) * 100)}%`,
-                              width: `${Math.max(0.1, ((Math.min(a.to, end) - Math.max(a.from, start)) / span) * 100)}%`,
-                            }}
-                            title={`${a.app} · ${labels[a.category] || labels.unknown}`}
-                          />
-                        ))}
-                      </div>
-                      {frames.map((f, i) =>
-                        i && f.at - frames[i - 1].at > (frames[i - 1].interval || 60) * 1800 ? (
-                          <div
-                            key={f.id}
-                            className="gap-mark"
-                            style={{
-                              left: `${((frames[i - 1].at - start) / span) * 100}%`,
-                              width: `${((f.at - frames[i - 1].at) / span) * 100}%`,
-                            }}
-                            title="Interruption ou intervalle sans capture"
-                          />
-                        ) : null,
-                      )}
-                      {rangeStart && rangeEnd && (
-                        <div
-                          className="range-highlight"
-                          style={{
-                            left: `${((Math.min(rangeStart, rangeEnd) - start) / span) * 100}%`,
-                            width: `${(Math.abs(rangeEnd - rangeStart) / span) * 100}%`,
-                          }}
-                        />
-                      )}
-                      <div
-                        className="software-lane"
-                        aria-label="Logiciels utilisés sur la timeline"
-                      >
-                        {softwareSegments
-                          .filter((a) => a.to >= start && a.from <= end)
-                          .map((a, i) => (
-                            <button
-                              key={i}
-                              className={`software-segment ${a.category || 'unknown'}`}
-                              style={{
-                                left: `${Math.max(0, ((a.from - start) / span) * 100)}%`,
-                                width: `${Math.max(0.2, ((Math.min(a.to, end) - Math.max(a.from, start)) / span) * 100)}%`,
-                              }}
-                              title={`${a.app} · ${shortTime(a.from)}–${shortTime(a.to)} · ${duration(a.ms)}`}
-                              aria-label={`${a.app} · ${shortTime(a.from)} · ${duration(a.ms)}`}
-                              onClick={() => seek(Math.max(start, a.from))}
-                            >
-                              <span>{a.app}</span>
-                            </button>
-                          ))}
-                      </div>
-                      <div
-                        className="playhead"
-                        style={{ left: `${((playheadTime - start) / span) * 100}%` }}
-                      >
-                        <span />
-                      </div>
+                    <label className="inline-slider" title="Vitesse de lecture">
                       <input
-                        className="scrubber"
-                        aria-label="Curseur de la timeline"
+                        aria-label="Vitesse de lecture"
                         type="range"
-                        min={start}
-                        max={end}
+                        min="1"
+                        max="8"
                         step="1"
-                        value={
-                          cursor === null || follow
-                            ? current.at
-                            : Math.max(start, Math.min(end, cursor))
-                        }
-                        onChange={(e) => seek(e.target.value)}
+                        value={speed}
+                        onChange={(e) => setSpeed(Number(e.target.value))}
                       />
-                    </div>
+                      <output>{speed} img/s</output>
+                    </label>
                   </div>
-                  <div className="timeline-foot">
-                    <span>
-                      <span className="key">←</span> <span className="key">→</span> Image par image{' '}
-                      <span className="key">Espace</span> Lecture
-                    </span>
-                    <span>Instants capturés, pas un enregistrement continu.</span>
-                  </div>
-                </section>
+                </div>
+                <Timeline
+                  frames={frames}
+                  segments={softwareSegments}
+                  start={start}
+                  end={end}
+                  cursor={playheadTime}
+                  zoom={timelineZoom}
+                  setZoom={setTimelineZoom}
+                  seek={seek}
+                />
               </>
             )}
             <section className="insights">
-              <div className="section-title">
-                <div>
-                  <h2>Où est passé le temps ?</h2>
-                  <p>
-                    {stats.total ? `${duration(stats.total)} observées · ` : ''}Logiciel au premier
-                    plan, relevé toutes les 2 secondes.
-                  </p>
-                </div>
-                <Activity size={20} />
-              </div>
               {stats.total ? (
                 <>
                   <div className="category-summary">
-                    {Object.entries(stats.categories).map(([cat, ms]) => (
-                      <div key={cat}>
-                        <span className={`legend-dot ${cat}`} />
-                        <span>{labels[cat]}</span>
-                        <strong>{duration(ms)}</strong>
-                      </div>
-                    ))}
+                    {Object.entries(stats.categories)
+                      .filter(([, ms]) => ms > 0)
+                      .map(([cat, ms]) => (
+                        <div key={cat}>
+                          <span className={`legend-dot ${cat}`} />
+                          <span>{labels[cat]}</span>
+                          <strong>{duration(ms)}</strong>
+                        </div>
+                      ))}
                   </div>
                   <div className="distribution" aria-label="Répartition estimée du temps">
                     {Object.entries(stats.categories)
@@ -1081,7 +811,6 @@ export default function App() {
                   <div className="app-breakdown">
                     {stats.apps.slice(0, 8).map((a, i) => (
                       <div className="app-stat" key={a.name}>
-                        <span className="app-rank">{String(i + 1).padStart(2, '0')}</span>
                         <span>{a.name}</span>
                         <div className="app-stat-bar">
                           {Object.entries(a.categories)
@@ -1102,25 +831,10 @@ export default function App() {
                     ))}
                   </div>
                 </>
-              ) : (
-                <p className="insight-empty">
-                  {active && !data.trackingAvailable
-                    ? 'Le suivi des logiciels démarre ou n’est pas disponible. Les captures restent indépendantes.'
-                    : 'La répartition se construit pendant vos sessions, sans rien saisir.'}
-                </p>
-              )}
-              <p className="hint">
-                Le classement utilise des indices locaux, sans IA ni envoi de données. Un loisir
-                peut servir au travail ; les cas ambigus restent indéterminés. Aucun titre de
-                fenêtre n’est conservé.
-              </p>
+              ) : null}
             </section>
             {frames.length > 0 && (
               <div className="archive-actions">
-                <span>
-                  {(data.bytes / 1024 / 1024).toFixed(1)} Mo conservés · suppression après{' '}
-                  {settings.retentionDays} jours
-                </span>
                 <div>
                   <button className="text-button" onClick={() => setConfirmDelete('frame')}>
                     <Trash2 size={14} /> Supprimer cette capture
