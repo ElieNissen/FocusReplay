@@ -50,3 +50,11 @@ Dans **Réglages → Sons**, règle le volume ou coupe les sons. Les sons de l�
 Pendant une session, **Réglages → Suivi → Essayer le rappel** déclenche « Sur quoi tu travailles ? ». Réponds dans la notification Windows ou clique dessus pour ouvrir le petit panneau. **J’ai arrêté de travailler** met la session en pause, ouvre FocusReplay et demande pourquoi. Tu peux ignorer la question ; la pause reste active jusqu’à une reprise manuelle.
 
 Active **Demander pourquoi je quitte le travail** pour afficher ce panneau après une minute sur un logiciel ou site classé Loisir ou Indéterminé. Les rappels sont espacés d’au moins dix minutes. Les réponses se retrouvent dans **Repères**, sous la timeline ; les petites bulles sur la timeline permettent de revenir au moment concerné.
+
+## Timeline et récompenses (0.6)
+
+**Q / flèche gauche** : image précédente. **D / flèche droite** : image suivante. La molette zoome autour de la souris ; le curseur de zoom zoome autour du point de lecture.
+
+Chaque bloc résume une période : logiciel dominant, durée réellement observée et nombre d’autres logiciels. Clique pour retrouver toutes les durées, y compris les passages courts, et ajuster leur classement. Les pauses, verrouillages et intervalles entre sessions sont grisés. Les icônes se complètent automatiquement au fil de l’utilisation des logiciels.
+
+Les récompenses utilisent maintenant des minutes de travail : par exemple **25 min travaillées → 5 min de pause**. Modifie directement ces deux durées pour chaque récompense. Les anciens points sont convertis automatiquement selon ton dernier taux configuré.

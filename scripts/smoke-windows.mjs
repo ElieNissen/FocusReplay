@@ -47,6 +47,15 @@ try {
       timeout: 20000,
     })
     .toBe(true);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          window.focusReplay.state().then((s) => Object.keys(s.appIcons || {}).length),
+        ),
+      { timeout: 15000 },
+    )
+    .toBeGreaterThan(0);
   const result = await page.evaluate(() =>
     window.focusReplay.state().then((s) => ({
       captures: s.sessions.at(-1).frames.length,

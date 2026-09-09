@@ -9,7 +9,7 @@
 - **One-click sessions:** automatic names, start/pause/resume/stop, tray controls and an optional floating mini-bar.
 - **Real pauses:** 2, 5, 10 or 15 minutes, a custom duration, or an indefinite pause. Timed pauses end with a chime and notification; recording only resumes when you ask. Ending a session cancels its pause alarm.
 - **Two independent records:** screenshots every 10 seconds to 10 minutes; foreground application estimates every 2 seconds.
-- **Interactive replay:** drag the timeline for immediate preview, step with the arrow keys, press Space to play, use the mouse wheel to zoom the timeline and drag sliders for 1–8× zoom or 1–8 images/second, and review while recording continues.
+- **Interactive replay:** drag the timeline for immediate preview, step with Q/D or the arrow keys, press Space to play, use the mouse wheel to zoom the timeline and drag sliders for 1–8× zoom or 1–8 images/second, and review while recording continues.
 - **Application timeline:** labeled segments link software usage to the nearest preceding screenshot. The summary shows application durations and percentages of observed time.
 - **Automatic, cautious categories:** work probable, distraction probable, unknown and idle. Browser hints are processed locally without retaining raw window titles. No AI service or productivity score.
 - **Interactive reminders:** answer “Sur quoi tu travailles ?” directly in a Windows notification. “J’ai arrêté de travailler” pauses the session and opens a small reason form. Replies appear as timeline markers and in Repères. An optional floating prompt asks about non-work usage after one minute, at most once every ten minutes. Responses are optional.
@@ -19,7 +19,7 @@
 - **Bounded storage:** compressed JPEGs, 3-day retention and 1 GB capture cap by default.
 - **Dark and light themes**, plus Windows theme preference.
 - **Optional camera photos:** off by default, explicit in-app consent, no microphone. A camera photo accompanies each screenshot and appears in picture-in-picture during replay and optionally in the MP4. Camera access stops during pauses, locking and session end.
-- **Optional rewards:** configurable points per hour, custom break/game/movie rewards, a persistent points balance and a pause timer. Normal pauses never require points.
+- **Optional rewards:** accumulated work minutes unlock custom break/game/movie rewards directly. Each reward states its required work minutes and reward duration. Milestones celebrate 25 minutes, 1, 2, 4 and 8 hours of cumulative eligible work. Normal pauses remain free.
 
 ## Run on Windows
 
@@ -47,7 +47,7 @@ For music and capture options, open **Réglages**. Reducing retention or the cap
 npm run dist
 ```
 
-The build is written to `release/FocusReplay-0.5.0-Windows.exe`. It is unsigned; Windows may show a publisher warning. Signing and a public binary release are not configured. The encoder's third-party notices and source-distribution requirements are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The build is written to `release/FocusReplay-0.6.0-Windows.exe`. It is unsigned; Windows may show a publisher warning. Signing and a public binary release are not configured. The encoder's third-party notices and source-distribution requirements are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## What the numbers mean
 
@@ -126,3 +126,11 @@ Native inline replies use Electron 44 Windows notifications. A notification clic
 **Demander pourquoi je quitte le travail** is off by default. It includes both probable leisure and unknown foreground software/sites, excludes idle and FocusReplay itself, waits for one minute of consecutive observed activity and uses a shared ten-minute cooldown. It does not pause automatically. The stop-working button pauses explicitly, without a timer or automatic restart. Check-ins expire after ten minutes and are invalidated on lock, session end or an incompatible pause/resume. Replies (500 characters maximum), prompt/response times and the application/domain are stored with session events and follow the same retention/deletion rules. Dismissals are recorded without text and hidden from Repères. No response is required to continue using the app.
 
 Notification support: [Electron Notification API](https://www.electronjs.org/docs/latest/api/notification). UI tests exercise the fallback overlay and simulated native reply/action events; they do not certify a human reply in the Windows notification center.
+
+### Daily timeline and minute rewards (0.6)
+
+The software lane uses fixed chronological overview blocks. The dominant application/site is labeled with its observed duration; +N lists the remaining applications in the block. Clicking shows every application and its exact accumulated duration, including brief switches. The thin category strip retains proportional timing; a summary block does not claim its dominant app occupied the entire interval. Zoom refines the blocks without stacked labels. Session pauses, locking and time between sessions replace repeated thumbnails with labeled gaps. Native app icons are learned when applications are used; unavailable icons use a generic fallback. Executable paths remain in memory and are never stored in session history.
+
+Rewards now accrue one work minute per eligible observed minute. A reward might exchange 25 work minutes for 5 break minutes. Existing point balances and reward costs migrate once using the last configured points-per-hour rate; costs round up to a whole minute. Subsequent work accrues directly, independently of that legacy rate. Already crossed milestones are marked during migration without replaying notifications.
+
+`npm run test:timeline` generates a fictional ten-hour day with rapid app switches and verifies grouping, pauses, Q/D and thumbnail stability during zoom.

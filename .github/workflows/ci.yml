@@ -20,4 +20,5 @@ jobs:
       - run: npm run build
       - run: npm run check:privacy
       - run: npm run test:e2e
+      - run: node scripts/test-timeline.mjs
       - run: node scripts/test-dev.mjs
