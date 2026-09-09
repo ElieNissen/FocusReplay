@@ -1,6 +1,6 @@
 # FocusReplay
 
-**Start. Work. Rewind.** A private Windows app that makes your workday visible through periodic screenshots and foreground application history. No goals to type, no manual journal, no account.
+**Start. Work. Rewind.** A private Windows app that makes your workday visible through periodic screenshots and foreground application history. No goals to type, no manual journal. No account required for recording.
 
 ![FocusReplay dark interface with fictional demonstration data](docs/images/replay-dark.png)
 
@@ -13,7 +13,7 @@
 - **Application timeline:** labeled segments link software usage to the nearest preceding screenshot. The summary shows application durations and percentages of observed time.
 - **Automatic, cautious categories:** work probable, distraction probable, unknown and idle. Browser hints are processed locally without retaining raw window titles. No AI service or productivity score.
 - **Gentle reminders:** configurable session reminders and optional probable-distraction nudges.
-- **Start music:** import your own MP3, choose the volume and a 15/30/60-second intro or the complete track. No Spotify integration in this version.
+- **Start music:** import your own MP3, choose the volume and a 15/30/60-second intro or the complete track. Optional Spotify music supports app launch, session intro and a session soundtrack.
 - **MP4 export:** one click exports the selected day or session in 1080p, at the current playback speed. Large timestamps, software names/durations, category bands and a moving timeline show the context. Explorer reveals the finished video.
 - **Bounded storage:** compressed JPEGs, 3-day retention and 1 GB capture cap by default.
 - **Dark and light themes**, plus Windows theme preference.
@@ -66,7 +66,22 @@ Data lives outside the repository, normally in `%APPDATA%/FocusReplay`. Use **R�
 
 Advanced: launch with `--focus-data-dir="D:\FocusReplayData"` to choose a separate local profile. Keep that folder private and outside your source repository.
 
-See [SECURITY.md](SECURITY.md) for exact data flow, retention and limitations. The app does not encrypt local files or send them anywhere.
+See [SECURITY.md](SECURITY.md) for exact data flow, retention and limitations. Capture files stay local and are not encrypted by the app. Optional Spotify credentials use Windows encryption.
+
+## Music (Spotify or local MP3)
+
+Three independent switches in **Réglages → Musique**: app launch, session intro and session soundtrack. Each accepts the imported MP3, one Spotify track, up to 100 pasted track links (shuffled without duplicates), or a playlist link. The intro completes before the soundtrack begins. Nothing loops. Starting a session interrupts launch music. Pause, lock, stop and Quit stop app-controlled music; resume does not automatically restart it. Use Écouter to play it again.
+
+Spotify setup, once per local profile:
+
+1. A Spotify Premium account is required. Open **Connecter Spotify → Ouvrir Spotify Developers** and create a development app using Web API. Current development-mode apps allow up to five authorized accounts.
+2. Register exactly `http://127.0.0.1:43827/callback` as its redirect URI. Copy the **Client ID** (never the Client Secret) into FocusReplay and sign in through Spotify's browser page.
+3. Open Spotify on the PC and play a track once. In FocusReplay, refresh and choose that PC under **Compte et appareil Spotify**. Playback always targets the selected device.
+4. Enable the desired phase, choose Spotify and paste a track/playlist link or one track link per line. Save. **Écouter** tests that phase.
+
+The Web API controls Spotify Connect; FocusReplay does not download Spotify music or include it in exported videos. Explicit track selections are stopped at the final track boundary to prevent recommendations; network latency may slightly affect that boundary. Playlists use Spotify's own order with repeat and shuffle disabled. Disable Spotify Autoplay to prevent recommended music after a playlist ends. Manually choosing a different song/device relinquishes control and cancels the pending soundtrack. Spotify errors never interrupt capture.
+
+[Spotify playback requirements](https://developer.spotify.com/documentation/web-api/reference/start-a-users-playback) · [Development-mode limits](https://developer.spotify.com/documentation/web-api/tutorials/february-2026-migration-guide)
 
 ## Development and verification
 

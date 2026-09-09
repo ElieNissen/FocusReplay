@@ -3,6 +3,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { EventEmitter } = require('node:events');
 const { classify } = require('./tracker.cjs');
+const { defaults: musicSlots, validateMusic } = require('./music-config.cjs');
 
 const DEFAULTS = Object.freeze({
   interval: 60,
@@ -12,7 +13,9 @@ const DEFAULTS = Object.freeze({
   quality: 72,
   displayId: '',
   musicEnabled: true,
-  musicSeconds: 30,
+  musicSlots,
+  spotifyDevice: '',
+  musicSeconds: 0,
   volume: 0.5,
   reminderMinutes: 15,
   widget: false,
@@ -73,7 +76,13 @@ function validateSettings(input, previous = DEFAULTS) {
     pointsPerHour: [1, 1000],
   };
   for (const [key, value] of Object.entries(input || {})) {
-    if (key === 'appRules') {
+    if (key === 'musicSlots') {
+      s.musicSlots = validateMusic(value);
+    } else if (key === 'spotifyDevice') {
+      if (typeof value !== 'string' || value.length > 200)
+        throw new Error('Appareil Spotify invalide.');
+      s.spotifyDevice = value;
+    } else if (key === 'appRules') {
       if (
         !value ||
         Array.isArray(value) ||
@@ -177,7 +186,13 @@ class Recorder extends EventEmitter {
       if (loaded.version !== 1 || !Array.isArray(loaded.sessions))
         throw new Error('Format inconnu');
       this.data = loaded;
+      const legacyMusic = !loaded.settings.musicSlots;
       this.data.settings = validateSettings(loaded.settings);
+      if (legacyMusic)
+        this.data.settings.musicSlots = {
+          ...musicSlots,
+          intro: { ...musicSlots.intro, enabled: loaded.settings.musicEnabled !== false },
+        };
     } catch (e) {
       if (e.code !== 'ENOENT')
         throw new Error(

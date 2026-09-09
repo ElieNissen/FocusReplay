@@ -2,7 +2,7 @@
 
 ## Data flow
 
-The application makes no application-level network requests, analytics calls or AI requests during normal recording and replay. It does not require an account. Build-time npm downloads are separate from application runtime.
+Recording and replay make no analytics or AI requests. Optional Spotify music sends authorization and playback requests to accounts.spotify.com and api.spotify.com; screenshots and activity are never sent to Spotify. Recording does not require an account. Build-time npm downloads are separate from application runtime.
 
 Screenshots, application names, category estimates, session timestamps and settings are written under Electron's per-user `FocusReplay` data directory. On Windows this is normally `%APPDATA%/FocusReplay`. A chosen MP3 is copied there using a generic filename. Nothing is stored in the source repository by default.
 
@@ -25,6 +25,12 @@ The optional reward wallet persists aggregate points, counted time, configured r
 ## Application boundary
 
 The renderer is sandboxed, context-isolated, has no Node integration and receives a narrow IPC API. Handlers check the calling window and main frame. Media uses generated capture IDs and never accepts arbitrary filesystem paths. Navigation and popups are denied. Permission requests are denied except opted-in video capture for the main recording window. Export passes argument arrays to a fixed local executable without a shell. Export labels are escaped and staging filenames are generated internally.
+
+## Optional Spotify connection
+
+Authorization uses PKCE and a short-lived HTTP callback listening only on 127.0.0.1:43827. Random state binds the callback to the login attempt. There is no client secret. Refresh/access tokens are encrypted with Electron safeStorage (Windows account protection) in spotify-auth.bin, separate from session metadata; the renderer receives only connection status. Disconnect removes the local credentials, and authorization can also be revoked from Spotify account settings. The Client ID, device selection and user-entered music links are local settings; never commit a user profile.
+
+Only user-read-playback-state and user-modify-playback-state permissions are requested. Playback targets the explicitly chosen Spotify device and stops only while the current device/content still match app-controlled playback. Spotify state changes cannot be made atomic with remote user actions; a simultaneous manual change or loss of connectivity can race the final stop command. Repeat/shuffle are set off for each app-triggered playback and are not restored automatically.
 
 ## Reporting a problem
 

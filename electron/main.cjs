@@ -14,6 +14,7 @@ const {
   protocol,
   net,
   nativeTheme,
+  safeStorage,
 } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
@@ -23,6 +24,9 @@ const { Recorder, selectFrames } = require('./core.cjs');
 const { startTracker } = require('./tracker.cjs');
 const { exportVideo } = require('./export.cjs');
 const { exportName } = require('./export-overlay.cjs');
+const { Spotify } = require('./spotify.cjs');
+const { MusicDirector } = require('./music-director.cjs');
+const { selection, phases } = require('./music-config.cjs');
 
 const testMode = !app.isPackaged && process.env.FOCUS_E2E === '1';
 const devUrl =
@@ -61,6 +65,38 @@ let main,
   lastNudge = 0;
 let cameraConsent = false,
   cameraPending = null;
+let spotify,
+  musicDirector,
+  localMusic,
+  musicStatus = { playing: false, error: '' };
+const musicSnapshot = () => ({ ...musicStatus, spotify: spotify?.status() });
+const musicChanged = () => send('focus:music-status', musicSnapshot());
+function playLocal(signal, phase) {
+  if (!recorder.data.music) return;
+  return new Promise((resolve, reject) => {
+    const id = randomUUID();
+    const abort = () => {
+      send('focus:music-command', { type: 'stop', id });
+      finish();
+    };
+    const finish = (error) => {
+      signal.removeEventListener('abort', abort);
+      if (localMusic?.id === id) localMusic = null;
+      error
+        ? reject(new Error('Impossible de lire ce MP3. Choisissez un autre fichier.'))
+        : resolve();
+    };
+    localMusic = { id, finish };
+    signal.addEventListener('abort', abort, { once: true });
+    if (signal.aborted) return abort();
+    send('focus:music-command', {
+      type: 'play',
+      id,
+      volume: recorder.data.settings.volume,
+      seconds: phase === 'intro' ? recorder.data.settings.musicSeconds : 0,
+    });
+  });
+}
 const dataDir = () => app.getPath('userData');
 const safe =
   (fn) =>
@@ -439,6 +475,33 @@ else {
         idle: () => (testMode ? 0 : powerMonitor.getSystemIdleTime()),
       });
       await recorder.init();
+      spotify = new Spotify({
+        dir: dataDir(),
+        encryption: safeStorage,
+        open: (url) => shell.openExternal(url),
+        onChange: musicChanged,
+      });
+      await spotify.init();
+      musicDirector = new MusicDirector({
+        settings: () => recorder.data.settings,
+        report: (error) => {
+          musicStatus.error = error;
+          musicChanged();
+        },
+        play: async (slot, signal, phase) => {
+          if (slot.source === 'local' && !recorder.data.music) return;
+          musicStatus = { playing: true, phase, error: '' };
+          musicChanged();
+          try {
+            return await (slot.source === 'spotify'
+              ? spotify.play(selection(slot), signal, recorder.data.settings.spotifyDevice)
+              : playLocal(signal, phase));
+          } finally {
+            musicStatus.playing = false;
+            musicChanged();
+          }
+        },
+      });
       cameraConsent = recorder.data.settings.cameraEnabled;
       protocol.handle('focusmedia', async (request) => {
         try {
@@ -466,6 +529,8 @@ else {
       tray.on('double-click', showMain);
       updateTray();
       recorder.on('change', (state) => {
+        musicDirector.observe(recorder.active, recorder.systemPaused);
+        musicDirector.changed();
         if (!recorder.active || recorder.active.status === 'paused' || recorder.systemPaused)
           stopCamera();
         if (
@@ -493,6 +558,36 @@ else {
         send('focus:break-ended', { name: reward.name });
       });
       bind('state', () => ({ ...recorder.snapshot(), exportState, version: app.getVersion() }));
+      bind('musicState', musicSnapshot);
+      bind('musicReady', () => musicDirector.open());
+      bind('musicStop', () => musicDirector.stop());
+      bind('musicPreview', (phase) => {
+        if (phase === 'local') {
+          musicDirector.run(['intro'], { intro: { enabled: true, source: 'local' } });
+          return;
+        }
+        if (!phases.includes(phase)) throw new Error('Musique invalide.');
+        musicDirector.run([phase]);
+      });
+      bind('musicDone', (id, error) => {
+        if (localMusic?.id === id) localMusic.finish(Boolean(error));
+      });
+      bind('spotifyConnect', async (id) => {
+        const status = await spotify.connect(id);
+        musicStatus.error = '';
+        musicChanged();
+        return status;
+      });
+      bind('spotifyDisconnect', async () => {
+        await musicDirector.stop();
+        return spotify.disconnect();
+      });
+      bind('spotifyDevices', async () =>
+        ((await spotify.request('/me/player/devices')).devices || [])
+          .filter((d) => !d.is_restricted)
+          .map((d) => ({ id: d.id, name: d.name, type: d.type })),
+      );
+      bind('spotifySetup', () => shell.openExternal('https://developer.spotify.com/dashboard'));
       bind('screens', () =>
         screen.getAllDisplays().map((d, i) => ({
           id: String(d.id),
@@ -521,6 +616,8 @@ else {
         if (settings.cameraEnabled === true && !cameraConsent)
           throw new Error('Autorisez d’abord la caméra dans les réglages.');
         await recorder.settings(settings);
+        if (settings.musicSlots || (localMusic && settings.musicEnabled === false))
+          musicDirector.stop();
         if (!testMode && hints !== recorder.data.settings.browserHints) {
           tracker?.stop();
           tracker =
@@ -592,6 +689,7 @@ else {
       });
       bind('removeMusic', () =>
         recorder.run(async () => {
+          if (localMusic) await musicDirector.stop();
           recorder.data.music = false;
           await fs.rm(path.join(dataDir(), 'music.mp3'), { force: true });
           await recorder.save();
@@ -676,7 +774,8 @@ else {
     tracker?.stop();
     stopCamera();
     exportJob?.abort();
-    Promise.allSettled([recorder?.stop(), exportCompletion]).finally(() => {
+    spotify?.cancelLogin?.();
+    Promise.allSettled([recorder?.stop(), exportCompletion, musicDirector?.stop()]).finally(() => {
       quitting = true;
       app.quit();
     });

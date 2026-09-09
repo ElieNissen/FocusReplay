@@ -49,6 +49,7 @@ import { Camera, CameraOff, Gift } from 'lucide-react';
 import { useCamera } from './useCamera';
 import { Rewards, BreakBanner } from './Rewards';
 import { playChime } from './chime';
+import { useMusic } from './useMusic';
 const api = window.focusReplay;
 const imageUrl = (f) => (f ? `focusmedia://capture/${f.id}` : '');
 const sessionName = (s) => `Session de ${shortTime(s.startedAt)}`;
@@ -78,14 +79,14 @@ export default function App() {
     [loadedImage, setLoadedImage] = useState(''),
     [brokenImage, setBrokenImage] = useState('');
 
-  const [musicPlaying, setMusicPlaying] = useState(false);
-  const audio = useRef(null),
-    musicTimer = useRef(null),
-    musicSession = useRef(undefined),
-    stage = useRef(null),
+  const stage = useRef(null),
     latest = useRef({});
   const widget = location.hash === '#widget';
   const cameraStatus = useCamera(data, widget);
+  const { audio, musicStatus, musicPlaying, stopMusic, playMusic, musicEnded } = useMusic(
+    Boolean(data),
+    widget,
+  );
 
   const [pauseMenu, setPauseMenu] = useState(false),
     [pauseMinutes, setPauseMinutes] = useState(5);
@@ -108,7 +109,6 @@ export default function App() {
     api
       .state()
       .then((s) => {
-        musicSession.current = s.sessions.find((x) => !x.endedAt)?.id || null;
         setData(s);
         setExportState(s.exportState);
       })
@@ -120,7 +120,6 @@ export default function App() {
       off();
       offExport();
       clearInterval(t);
-      clearInterval(musicTimer.current);
     };
   }, []);
   useEffect(() => {
@@ -140,40 +139,6 @@ export default function App() {
     media.addEventListener('change', apply);
     return () => media.removeEventListener('change', apply);
   }, [settings?.theme]);
-  const stopMusic = () => {
-    clearInterval(musicTimer.current);
-    audio.current?.pause();
-    setMusicPlaying(false);
-  };
-  const playMusic = () => {
-    if (!audio.current || !data?.music) return;
-    clearInterval(musicTimer.current);
-    audio.current.volume = settings.volume;
-    audio.current.currentTime = 0;
-    audio.current
-      .play()
-      .then(() => setMusicPlaying(true))
-      .catch(() =>
-        setError('Impossible de lire ce MP3. Essayez un autre fichier dans les réglages.'),
-      );
-    if (settings.musicSeconds)
-      musicTimer.current = setInterval(() => {
-        const remaining = settings.musicSeconds - audio.current.currentTime;
-        audio.current.volume = settings.volume * Math.max(0, Math.min(1, remaining / 3));
-        if (remaining <= 0) stopMusic();
-      }, 150);
-  };
-  useEffect(() => {
-    if (!data || widget) return;
-    if (active && musicSession.current !== undefined && active.id !== musicSession.current) {
-      musicSession.current = active.id;
-      if (settings.musicEnabled && data.music) playMusic();
-    }
-    if (!active || paused) stopMusic();
-  }, [active?.id, paused]);
-  useEffect(() => {
-    if (!data?.music || settings?.musicEnabled === false) stopMusic();
-  }, [data?.music, settings?.musicEnabled]);
   const sessions = useMemo(
     () =>
       data?.sessions
@@ -555,6 +520,13 @@ export default function App() {
           </div>
         )}
         <BreakBanner wallet={data.wallet} pauseTimer={data.pauseTimer} clock={clock} act={act} />
+        {musicStatus.error && view !== 'settings' && (
+          <div className="notice" role="status">
+            <Music2 size={17} />
+            <span>{musicStatus.error}</span>
+            <button onClick={() => setView('settings')}>Musique</button>
+          </div>
+        )}
         {data.cameraWarning && settings.cameraEnabled && active && (
           <div className="notice" role="status">
             <CameraOff size={17} />
@@ -579,6 +551,7 @@ export default function App() {
             playMusic={playMusic}
             stopMusic={stopMusic}
             musicPlaying={musicPlaying}
+            musicStatus={musicStatus}
           />
         ) : (
           <>
@@ -877,7 +850,13 @@ export default function App() {
         )}
       </main>
       {data.music && (
-        <audio ref={audio} src="focusmedia://music/track" preload="auto" onEnded={stopMusic} />
+        <audio
+          ref={audio}
+          src="focusmedia://music/track"
+          preload="auto"
+          onEnded={musicEnded}
+          onError={() => musicEnded(true)}
+        />
       )}
     </div>
   );

@@ -13,6 +13,7 @@ import {
   FolderOpen,
 } from 'lucide-react';
 import { Toggle } from './Toggle';
+import MusicSettings from './MusicSettings';
 const api = window.focusReplay;
 export default function SettingsView({
   settings,
@@ -23,6 +24,7 @@ export default function SettingsView({
   playMusic,
   stopMusic,
   musicPlaying,
+  musicStatus,
 }) {
   const [screens, setScreens] = useState([]),
     [cameraConsentOpen, setCameraConsentOpen] = useState(false);
@@ -177,9 +179,10 @@ export default function SettingsView({
           </div>
         )}
       </section>
+      <MusicSettings settings={settings} act={act} busy={busy} status={musicStatus} />
       <section className="settings-section">
         <h2>
-          <Music2 size={19} /> Votre signal de départ
+          <Music2 size={19} /> MP3 local
         </h2>
         <div className="setting-row">
           <span>
@@ -212,12 +215,7 @@ export default function SettingsView({
             </button>
           </div>
         )}
-        {toggle(
-          'musicEnabled',
-          'Jouer au début de la session',
-          'La musique ne redémarre pas après une pause.',
-        )}
-        {select('musicSeconds', 'Durée du signal', [
+        {select('musicSeconds', 'Durée du MP3 de début', [
           [15, '15 secondes'],
           [30, '30 secondes'],
           [60, '1 minute'],
@@ -307,8 +305,9 @@ export default function SettingsView({
           <ShieldCheck size={19} /> Vos données restent ici
         </h2>
         <p>
-          Pas de compte, de télémétrie, de cloud ni d’analyse distante. Les captures peuvent
-          contenir ce qui était visible à l’écran. Elles restent hors du dépôt du logiciel.
+          Les captures et l’activité restent locales. Spotify, si connecté, reçoit uniquement les
+          commandes de musique. Les captures peuvent contenir ce qui était visible à l’écran. Elles
+          restent hors du dépôt du logiciel.
         </p>
         <div className="privacy-stats">
           <span>{(data.bytes / 1024 / 1024).toFixed(1)} Mo de captures</span>

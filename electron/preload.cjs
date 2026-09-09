@@ -1,6 +1,15 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const methods = [
   'state',
+  'musicState',
+  'musicReady',
+  'musicStop',
+  'musicPreview',
+  'musicDone',
+  'spotifyConnect',
+  'spotifyDisconnect',
+  'spotifyDevices',
+  'spotifySetup',
   'screens',
   'start',
   'pause',
@@ -26,6 +35,16 @@ const methods = [
 const api = Object.fromEntries(
   methods.map((method) => [method, (...args) => ipcRenderer.invoke('focus:' + method, ...args)]),
 );
+for (const [method, channel] of [
+  ['onMusicStatus', 'music-status'],
+  ['onMusicCommand', 'music-command'],
+]) {
+  api[method] = (callback) => {
+    const listener = (_, value) => callback(value);
+    ipcRenderer.on('focus:' + channel, listener);
+    return () => ipcRenderer.removeListener('focus:' + channel, listener);
+  };
+}
 api.onChange = (callback) => {
   const listener = (_, data) => callback(data);
   ipcRenderer.on('focus:change', listener);

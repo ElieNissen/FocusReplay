@@ -196,6 +196,43 @@ try {
   await page.getByRole('button', { name: 'Écouter un extrait', exact: true }).click();
   await expect.poll(() => page.locator('audio').evaluate((a) => !a.paused)).toBe(true);
   await page.getByRole('button', { name: 'Arrêter l’écoute', exact: true }).click();
+  await page.getByRole('button', { name: 'Écouter un extrait', exact: true }).click();
+  await expect.poll(() => page.locator('audio').evaluate((a) => a.ended && !a.loop)).toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => window.focusReplay.musicState().then((s) => s.playing)))
+    .toBe(false);
+  const launchMusic = page.getByRole('checkbox', {
+    name: 'À l’ouverture de l’application',
+    exact: true,
+  });
+  await launchMusic.check();
+  await page
+    .getByRole('combobox', { name: 'Source · À l’ouverture de l’application', exact: true })
+    .selectOption('spotify');
+  await page
+    .getByRole('combobox', { name: 'Choix · À l’ouverture de l’application', exact: true })
+    .selectOption('selection');
+  await page
+    .getByRole('textbox', { name: 'Liens Spotify · À l’ouverture de l’application', exact: true })
+    .fill('spotify:track:' + 'a'.repeat(22) + '\nspotify:track:' + 'b'.repeat(22));
+  await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Écouter · À l’ouverture de l’application', exact: true })
+    .click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Connectez Spotify' })).toBeVisible();
+  await launchMusic.uncheck();
+  await page.getByRole('checkbox', { name: 'Pendant la session', exact: true }).check();
+  await page
+    .getByRole('combobox', { name: 'Source · Pendant la session', exact: true })
+    .selectOption('spotify');
+  await page
+    .getByRole('combobox', { name: 'Choix · Pendant la session', exact: true })
+    .selectOption('playlist');
+  await page
+    .getByRole('textbox', { name: 'Liens Spotify · Pendant la session', exact: true })
+    .fill('https://open.spotify.com/playlist/' + 'c'.repeat(22));
+  await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Pendant la session', exact: true }).uncheck();
   await page.screenshot({ path: path.join(root, 'settings-light.png'), fullPage: true });
   await page.getByRole('button', { name: 'Retour au replay', exact: true }).click();
   await page.getByRole('button', { name: 'Commencer une session', exact: true }).click();

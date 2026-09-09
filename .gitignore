@@ -24,6 +24,7 @@ userdata/
 data/
 state.json*
 settings.json
+spotify-auth.bin*
 .DS_Store
 Thumbs.db
 *.pem
