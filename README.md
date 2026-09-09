@@ -1,6 +1,6 @@
 # FocusReplay
 
-**Start. Work. Rewind.** A private Windows app that makes your workday visible through periodic screenshots and foreground application history. No goals to type, no manual journal. No account required for recording.
+**Start. Work. Rewind.** A private Windows app that makes your workday visible through periodic screenshots and foreground application history. No goals to type; optional check-ins help explain interruptions. No account required for recording.
 
 ![FocusReplay dark interface with fictional demonstration data](docs/images/replay-dark.png)
 
@@ -12,8 +12,9 @@
 - **Interactive replay:** drag the timeline for immediate preview, step with the arrow keys, press Space to play, use the mouse wheel to zoom the timeline and drag sliders for 1–8× zoom or 1–8 images/second, and review while recording continues.
 - **Application timeline:** labeled segments link software usage to the nearest preceding screenshot. The summary shows application durations and percentages of observed time.
 - **Automatic, cautious categories:** work probable, distraction probable, unknown and idle. Browser hints are processed locally without retaining raw window titles. No AI service or productivity score.
-- **Gentle reminders:** configurable session reminders and optional probable-distraction nudges.
-- **Start music:** import your own MP3, choose the volume and a 15/30/60-second intro or the complete track. Optional Spotify music supports app launch, session intro and a session soundtrack.
+- **Interactive reminders:** answer “Sur quoi tu travailles ?” directly in a Windows notification. “J’ai arrêté de travailler” pauses the session and opens a small reason form. Replies appear as timeline markers and in Repères. An optional floating prompt asks about non-work usage after one minute, at most once every ten minutes. Responses are optional.
+- **Soft sound design:** synthesized interaction sounds and reminder chimes, with independent volume and mute. No downloaded sound assets.
+- **Start music:** import an independent MP3 for app launch, session intro and the session soundtrack; each track plays once without looping. Optional Spotify music supports app launch, session intro and a session soundtrack.
 - **MP4 export:** one click exports the selected day or session in 1080p, at the current playback speed. Large timestamps, software names/durations, category bands and a moving timeline show the context. Explorer reveals the finished video.
 - **Bounded storage:** compressed JPEGs, 3-day retention and 1 GB capture cap by default.
 - **Dark and light themes**, plus Windows theme preference.
@@ -46,7 +47,7 @@ For music and capture options, open **Réglages**. Reducing retention or the cap
 npm run dist
 ```
 
-The build is written to `release/FocusReplay-0.2.0-Windows.exe`. It is unsigned; Windows may show a publisher warning. Signing and a public binary release are not configured. The encoder's third-party notices and source-distribution requirements are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The build is written to `release/FocusReplay-0.5.0-Windows.exe`. It is unsigned; Windows may show a publisher warning. Signing and a public binary release are not configured. The encoder's third-party notices and source-distribution requirements are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## What the numbers mean
 
@@ -117,3 +118,11 @@ A distributor can set the public clientId in electron/spotify-app.json before bu
 ## Distribution and a possible hosted service
 
 Recording, replay, local audio and classification work independently of any account. Spotify remains an optional adapter. Public users can configure their own Premium development app; the shared FocusReplay client is explicitly invitation-only and is not advertised as generally available. A SaaS account/backend would not remove Spotify’s development cap or grant extended-quota eligibility. Any future hosted account should remain separate from provider authorization; refresh credentials must never be shared between users. No hosted accounts, billing or upload service are implemented in this version.
+
+### Check-in behavior
+
+Native inline replies use Electron 44 Windows notifications. A notification click or delivery failure opens the same response form as a protected, always-on-top overlay. Windows notification settings can suppress delivery; use **Réglages → Suivi → Essayer le rappel** during a session to try it. Without native delivery, the overlay remains the fallback.
+
+**Demander pourquoi je quitte le travail** is off by default. It includes both probable leisure and unknown foreground software/sites, excludes idle and FocusReplay itself, waits for one minute of consecutive observed activity and uses a shared ten-minute cooldown. It does not pause automatically. The stop-working button pauses explicitly, without a timer or automatic restart. Check-ins expire after ten minutes and are invalidated on lock, session end or an incompatible pause/resume. Replies (500 characters maximum), prompt/response times and the application/domain are stored with session events and follow the same retention/deletion rules. Dismissals are recorded without text and hidden from Repères. No response is required to continue using the app.
+
+Notification support: [Electron Notification API](https://www.electronjs.org/docs/latest/api/notification). UI tests exercise the fallback overlay and simulated native reply/action events; they do not certify a human reply in the Windows notification center.

@@ -400,6 +400,63 @@ try {
       { timeout: 16000 },
     )
     .toBeGreaterThan(before);
+  // Exercise the actual isolated overlay, its restricted IPC and persisted reasons.
+  const openPrompt = async () => {
+    const opened = app.waitForEvent('window');
+    expect(await page.evaluate(() => window.focusReplay.checkinPreview())).toBe(true);
+    const overlay = await opened;
+    await overlay.getByRole('textbox', { name: 'Votre réponse' }).waitFor();
+    return overlay;
+  };
+  let overlay = await openPrompt();
+  const denied = await overlay.evaluate(() =>
+    window.focusReplay.start().then(
+      () => false,
+      () => true,
+    ),
+  );
+  expect(denied).toBe(true);
+  await overlay.getByRole('textbox', { name: 'Votre réponse' }).fill('Préparer une maquette');
+  await overlay.screenshot({ path: path.join(root, 'checkin-work.png') });
+  await overlay.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.focusReplay
+          .state()
+          .then((s) => s.sessions.find((x) => !x.endedAt).events.at(-1).text),
+      ),
+    )
+    .toBe('Préparer une maquette');
+  overlay = await openPrompt();
+  const reasonWindow = app.waitForEvent('window');
+  await overlay.getByRole('button', { name: 'J’ai arrêté de travailler', exact: true }).click();
+  const reason = await reasonWindow;
+  await expect(reason.getByText('Pourquoi tu t’es arrêté ?', { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() =>
+      window.focusReplay.state().then((s) => s.sessions.find((x) => !x.endedAt).status),
+    ),
+  ).toBe('paused');
+  await reason.getByRole('button', { name: 'Fatigue', exact: true }).click();
+  await reason.screenshot({ path: path.join(root, 'checkin-reason.png') });
+  expect(await reason.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+    true,
+  );
+  await reason.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.focusReplay
+          .state()
+          .then((s) => s.sessions.find((x) => !x.endedAt).events.at(-1).text),
+      ),
+    )
+    .toBe('Fatigue');
+  await page.locator('.checkin-history summary').click();
+  await expect(
+    page.locator('.checkin-history').getByText('Fatigue', { exact: true }),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Terminer', exact: true }).click();
   await expect(page.getByText('Caméra autorisée', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Pauses & récompenses', exact: true }).click();

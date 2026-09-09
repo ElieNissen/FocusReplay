@@ -42,3 +42,11 @@ La structure des modules et la procédure de vérification sont expliquées dans
 **Raccourcis :** Espace lance ou arrête la lecture ; les flèches passent d’une capture à l’autre ; la molette sur la timeline zoome ou dézoome. Les curseurs horizontaux règlent la vitesse et le zoom. Les passages courts dans un logiciel restent lisibles grâce aux étiquettes décalées.
 
 **Classement :** les outils de code, bureautique et création reconnus comptent comme travail probable ; certains loisirs comme distraction probable. Les usages ambigus restent indéterminés. Dans Réglages → Classement des logiciels, une règle facultative par logiciel corrige aussi l’historique, sans annotations de session ni recalcul des points déjà gagnés.
+
+## Sons et interruptions
+
+Dans **Réglages → Sons**, règle le volume ou coupe les sons. Les sons de l’interface sont indépendants des MP3 et de Spotify.
+
+Pendant une session, **Réglages → Suivi → Essayer le rappel** déclenche « Sur quoi tu travailles ? ». Réponds dans la notification Windows ou clique dessus pour ouvrir le petit panneau. **J’ai arrêté de travailler** met la session en pause, ouvre FocusReplay et demande pourquoi. Tu peux ignorer la question ; la pause reste active jusqu’à une reprise manuelle.
+
+Active **Demander pourquoi je quitte le travail** pour afficher ce panneau après une minute sur un logiciel ou site classé Loisir ou Indéterminé. Les rappels sont espacés d’au moins dix minutes. Les réponses se retrouvent dans **Repères**, sous la timeline ; les petites bulles sur la timeline permettent de revenir au moment concerné.

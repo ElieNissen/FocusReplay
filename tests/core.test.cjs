@@ -406,3 +406,114 @@ test('site rules override app and automatic hints without storing page URLs', as
   assert.equal(domainOnly('file:///private.txt'), '');
   assert.equal(domainOnly('https://github.com.evil.example/path'), 'github.com.evil.example');
 });
+
+test('check-in replies persist; stopped-work pauses once and stale replies cannot touch a later session', async (t) => {
+  const { Checkins } = require('../electron/checkins.cjs');
+  const f = await fixture(t);
+  await f.r.start();
+  let visible = null,
+    opened = 0;
+  const c = new Checkins({
+    recorder: f.r,
+    now: () => f.r.now(),
+    present: (p) => {
+      visible = p;
+    },
+    close: () => {
+      visible = null;
+    },
+    showMain: () => {
+      opened++;
+    },
+  });
+  assert.equal(c.request('work'), true);
+  const p = c.pending;
+  await c.respond(p.id, 'answer', '  Préparer une maquette  ');
+  assert.equal(f.r.active.events.at(-1).text, 'Préparer une maquette');
+  assert.equal(f.r.active.status, 'recording');
+  assert.equal(c.request('work'), false);
+  f.advance(600001);
+  assert.equal(c.request('drift'), true);
+  const id = c.pending.id;
+  const results = await Promise.allSettled([c.respond(id, 'pause'), c.respond(id, 'pause')]);
+  assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
+  assert.equal(f.r.active.status, 'paused');
+  assert.equal(f.r.data.pauseTimer.endsAt, null);
+  assert.equal(opened, 1);
+  assert.equal(visible.kind, 'reason');
+  await c.respond(c.pending.id, 'answer', 'Fatigue');
+  assert.equal(f.r.active.events.at(-1).text, 'Fatigue');
+  assert.equal(f.r.active.status, 'paused');
+  const saved = JSON.parse(await fs.readFile(path.join(f.dir, 'state.json'), 'utf8'));
+  assert.equal(saved.sessions[0].events.at(-1).text, 'Fatigue');
+  await f.r.stop();
+  await f.r.start();
+  await assert.rejects(c.respond(id, 'pause'), /plus actif/);
+  assert.equal(f.r.active.status, 'recording');
+});
+
+test('check-ins reject oversized answers, expire, close on lock and never resume manual pauses', async (t) => {
+  const { Checkins } = require('../electron/checkins.cjs');
+  const f = await fixture(t);
+  await f.r.start();
+  const c = new Checkins({
+    recorder: f.r,
+    now: () => f.r.now(),
+    present: () => {},
+    close: () => {},
+    showMain: () => {},
+  });
+  c.request('work');
+  await assert.rejects(c.respond(c.pending.id, 'answer', 'x'.repeat(501)), /500/);
+  await assert.rejects(c.respond(c.pending.id, 'answer', ' '), /réponse/);
+  const id = c.pending.id;
+  await f.r.systemPause(true);
+  await assert.rejects(c.respond(id, 'pause'), /plus actif/);
+  assert.equal(c.pending, null);
+  await f.r.systemPause(false);
+  c.request('work', true);
+  f.advance(600001);
+  c.sync();
+  assert.equal(c.pending, null);
+  c.request('work', true);
+  await f.r.pauseFor(null);
+  c.sync();
+  assert.equal(c.pending, null);
+  assert.equal(f.r.active.status, 'paused');
+});
+
+test('sound settings preserve fractional volume and validate mute and range', () => {
+  assert.equal(validateSettings({ soundVolume: 0.25 }).soundVolume, 0.25);
+  assert.equal(validateSettings({ soundEnabled: false }).soundEnabled, false);
+  assert.throws(() => validateSettings({ soundVolume: 2 }));
+  assert.throws(() => validateSettings({ soundEnabled: 'yes' }));
+});
+
+test('Windows notification inline reply and stop action dispatch their original prompt', async () => {
+  const { attachNotification } = require('../electron/checkins.cjs');
+  const { EventEmitter } = require('node:events');
+  const n = new EventEmitter();
+  n.show = () => {};
+  const calls = [],
+    overlays = [];
+  attachNotification(
+    n,
+    { id: 'original' },
+    {
+      respond: async (...a) => calls.push(a),
+      overlay: (id) => overlays.push(id),
+      fail: () => assert.fail('unexpected failure'),
+    },
+  );
+  n.emit('reply', { reply: 'Maquette' });
+  n.emit('action', { actionIndex: 0 });
+  n.emit('reply', {}, 'Ancienne signature');
+  n.emit('click');
+  n.emit('failed');
+  assert.deepEqual(calls, [
+    ['original', 'answer', 'Maquette'],
+    ['original', 'pause'],
+    ['original', 'answer', 'Ancienne signature'],
+  ]);
+  assert.deepEqual(overlays, ['original', 'original']);
+});

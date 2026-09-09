@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import SettingsView from './SettingsView';
 import Timeline from './Timeline';
+import { CheckinHistory } from './CheckinOverlay';
 import {
   Play,
   Pause,
@@ -123,7 +124,12 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (!api || widget) return;
-    return api.onBreakEnded(playChime);
+    const offBreak = api.onBreakEnded(playChime);
+    const offCheckin = api.onCheckinSound(playChime);
+    return () => {
+      offBreak();
+      offCheckin();
+    };
   }, []);
   const active = data?.sessions.find((s) => !s.endedAt);
   const paused = active && (active.status === 'paused' || data.systemPaused);
@@ -146,7 +152,8 @@ export default function App() {
           (s) =>
             dayKey(s.startedAt) === day ||
             s.frames.some((f) => dayKey(f.at) === day) ||
-            s.activity.some((a) => dayKey(a.from) === day),
+            s.activity.some((a) => dayKey(a.from) === day) ||
+            s.events?.some((e) => e.type === 'checkin' && dayKey(e.at) === day),
         )
         .sort((a, b) => b.startedAt - a.startedAt) || [],
     [data, day],
@@ -174,7 +181,17 @@ export default function App() {
   const current = follow || cursor === null ? frames.at(-1) : frameAt(frames, cursor);
   const index = current ? frames.findIndex((f) => f.id === current.id) : -1;
   const start = frames.length ? Math.min(frames[0].at, segments[0]?.from ?? frames[0].at) : 0;
-  const end = Math.max(start + 1, frames.at(-1)?.at || 0, ...segments.map((a) => a.to));
+  const checkinEntries = sessions
+    .filter((s) => !selectedSession || s.id === selectedSession)
+    .flatMap((s) => s.events || [])
+    .filter((e) => e.type === 'checkin' && e.action !== 'dismiss' && dayKey(e.at) === day)
+    .sort((a, b) => a.at - b.at);
+  const end = Math.max(
+    start + 1,
+    frames.at(-1)?.at || 0,
+    ...segments.map((a) => a.to),
+    ...checkinEntries.map((e) => e.at),
+  );
   const playheadTime = follow
     ? end
     : cursor === null
@@ -708,6 +725,7 @@ export default function App() {
                 <Timeline
                   frames={frames}
                   segments={softwareSegments}
+                  checkins={checkinEntries}
                   start={start}
                   end={end}
                   cursor={playheadTime}
@@ -726,6 +744,7 @@ export default function App() {
                 />
               </>
             )}
+            <CheckinHistory entries={checkinEntries} seek={seek} />
             <section className="insights">
               {stats.total ? (
                 <>

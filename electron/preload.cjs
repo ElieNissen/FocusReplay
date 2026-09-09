@@ -1,6 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const methods = [
   'state',
+  'checkinState',
+  'checkinRespond',
+  'checkinPreview',
   'musicState',
   'musicReady',
   'musicStop',
@@ -41,6 +44,7 @@ const api = Object.fromEntries(
 );
 for (const [method, channel] of [
   ['onMusicStatus', 'music-status'],
+  ['onCheckinSound', 'checkin-sound'],
   ['onMusicCommand', 'music-command'],
 ]) {
   api[method] = (callback) => {

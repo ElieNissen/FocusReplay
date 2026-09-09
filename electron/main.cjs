@@ -21,6 +21,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { randomUUID } = require('node:crypto');
 const { Recorder, selectFrames } = require('./core.cjs');
+const { Checkins, attachNotification } = require('./checkins.cjs');
 const { startTracker } = require('./tracker.cjs');
 const { exportVideo } = require('./export.cjs');
 const { exportName } = require('./export-overlay.cjs');
@@ -52,6 +53,7 @@ protocol.registerSchemesAsPrivileged([
     privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
   },
 ]);
+let checkins, checkinWindow, checkinNotification;
 let main,
   widget,
   tray,
@@ -186,6 +188,64 @@ function createMain() {
       event.preventDefault();
       main.hide();
     }
+  });
+}
+function closeCheckin() {
+  const n = checkinNotification;
+  checkinNotification = null;
+  n?.close();
+  if (checkinWindow && !checkinWindow.isDestroyed()) checkinWindow.destroy();
+  checkinWindow = null;
+}
+function showCheckinOverlay(id, focus = false) {
+  if (checkins.pending?.id !== id) return;
+  if (checkinWindow && !checkinWindow.isDestroyed()) return;
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  checkinWindow = new BrowserWindow({
+    width: Math.min(420, area.width),
+    height: Math.min(checkins.pending.kind === 'work' ? 260 : 330, area.height),
+    x: area.x + Math.max(0, area.width - 440),
+    y: area.y + Math.max(0, area.height - 350),
+    show: false,
+    frame: false,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    backgroundColor: '#191b1e',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  const w = checkinWindow;
+  secureWindow(w);
+  w.setContentProtection(true);
+  w.once('ready-to-show', () => {
+    if (!w.isDestroyed()) focus ? w.show() : w.showInactive();
+  });
+  if (devUrl) w.loadURL(devUrl + '#checkin');
+  else w.loadFile(path.join(__dirname, '../dist/index.html'), { hash: 'checkin' });
+}
+function presentCheckin(prompt, overlay, focus = false) {
+  send('focus:checkin-sound');
+  if (overlay || testMode || !Notification.isSupported())
+    return showCheckinOverlay(prompt.id, focus);
+  const n = new Notification({
+    title: 'Sur quoi tu travailles ?',
+    body: 'FocusReplay',
+    hasReply: true,
+    replyPlaceholder: 'Ce que je fais…',
+    silent: true,
+    icon: icon(),
+    actions: [{ type: 'button', text: 'J’ai arrêté de travailler' }],
+  });
+  checkinNotification = n;
+  attachNotification(n, prompt, {
+    respond: (...args) => checkins.respond(...args),
+    overlay: (id) => showCheckinOverlay(id),
+    fail: () => showCheckinOverlay(prompt.id),
   });
 }
 function updateWidget() {
@@ -352,7 +412,11 @@ function notify(title, body) {
 function bind(name, handler) {
   ipcMain.handle('focus:' + name, (event, ...args) => {
     if (
-      ![main?.webContents, widget?.webContents].includes(event.sender) ||
+      !(
+        [main?.webContents, widget?.webContents].includes(event.sender) ||
+        (event.sender === checkinWindow?.webContents &&
+          ['checkinState', 'checkinRespond'].includes(name))
+      ) ||
       event.senderFrame !== event.sender.mainFrame
     )
       throw new Error('Origine non autorisée.');
@@ -541,11 +605,13 @@ else {
           return new Response('Introuvable', { status: 404 });
         }
       });
+      checkins = new Checkins({ recorder, present: presentCheckin, close: closeCheckin, showMain });
       createMain();
       tray = new Tray(icon());
       tray.on('double-click', showMain);
       updateTray();
       recorder.on('change', (state) => {
+        checkins.sync();
         musicDirector.observe(recorder.active, recorder.systemPaused);
         musicDirector.changed();
         if (!recorder.active || recorder.active.status === 'paused' || recorder.systemPaused)
@@ -578,6 +644,9 @@ else {
         send('focus:break-ended', { name: reward.name });
       });
       bind('state', () => ({ ...recorder.snapshot(), exportState, version: app.getVersion() }));
+      bind('checkinState', () => checkins.state());
+      bind('checkinRespond', (...args) => checkins.respond(...args));
+      bind('checkinPreview', () => checkins.request('work', true));
       bind('musicState', musicSnapshot);
       bind('musicReady', () => musicDirector.open());
       bind('musicStop', () => musicDirector.stop());
@@ -755,6 +824,7 @@ else {
       timer = setInterval(
         safe(async () => {
           await recorder.tick();
+          checkins.sync();
           const s = recorder.active,
             settings = recorder.data.settings,
             now = Date.now();
@@ -763,20 +833,20 @@ else {
               settings.reminderMinutes &&
               now - lastReminder >= settings.reminderMinutes * 60000
             ) {
-              notify('FocusReplay', 'Ta session continue. Toujours sur ce que tu voulais faire ?');
+              checkins.request('work');
               lastReminder = now;
             }
             const last = s.activity.at(-1);
             if (
-              settings.distractionReminder &&
-              last?.category === 'distraction' &&
+              (settings.driftPromptEnabled || settings.distractionReminder) &&
+              (last?.category === 'distraction' ||
+                (settings.driftPromptEnabled && last?.category === 'unknown')) &&
+              !/focusreplay|electron/i.test(last?.app || '') &&
               last.ms >= 60000 &&
               now - lastNudge > 600000
             ) {
-              notify(
-                'Un détour ?',
-                `${last.app} semble lié à une distraction. À toi de voir si c’est le bon moment.`,
-              );
+              if (settings.driftPromptEnabled) checkins.request('drift');
+              else notify('Un détour ?', `${last.app} · Loisir probable`);
               lastNudge = now;
             }
           }
@@ -791,6 +861,7 @@ else {
       app.quit();
     });
   app.on('before-quit', (e) => {
+    checkins?.clear();
     if (quitting) return;
     e.preventDefault();
     if (closing) return;

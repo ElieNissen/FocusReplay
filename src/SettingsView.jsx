@@ -168,12 +168,22 @@ export default function SettingsView({ settings, data, busy, act, onBack, musicS
       </section>
       <MusicSettings data={data} settings={settings} act={act} busy={busy} status={musicStatus} />
       <section className="settings-section">
-        <h2><Music2 size={19} /> Sons</h2>
+        <h2>
+          <Music2 size={19} /> Sons
+        </h2>
         {toggle('soundEnabled', 'Sons de l’interface')}
-        <label className="setting-row"><strong>Volume des sons</strong>
-          <input aria-label="Volume des sons" type="range" min="0" max="1" step="0.05"
-            disabled={!settings.soundEnabled || busy} value={settings.soundVolume}
-            onChange={(e) => save('soundVolume', Number(e.target.value))} />
+        <label className="setting-row">
+          <strong>Volume des sons</strong>
+          <input
+            aria-label="Volume des sons"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            disabled={!settings.soundEnabled || busy}
+            value={settings.soundVolume}
+            onChange={(e) => save('soundVolume', Number(e.target.value))}
+          />
         </label>
       </section>
       <section className="settings-section">
@@ -191,12 +201,19 @@ export default function SettingsView({ settings, data, busy, act, onBack, musicS
           'Signaler un détour probable',
           'Après une minute sur un loisir probable, au maximum un rappel toutes les 10 minutes.',
         )}
-        {select('reminderMinutes', 'Petit rappel de session', [
+        {toggle('driftPromptEnabled', 'Demander pourquoi je quitte le travail')}
+        {select('reminderMinutes', 'Sur quoi tu travailles ?', [
           [0, 'Désactivé'],
           [15, 'Toutes les 15 minutes'],
           [30, 'Toutes les 30 minutes'],
           [60, 'Toutes les heures'],
         ])}
+        <button
+          disabled={busy || !data.sessions.some((s) => !s.endedAt && s.status === 'recording')}
+          onClick={() => act(() => api.checkinPreview())}
+        >
+          Essayer le rappel
+        </button>
         {toggle(
           'widget',
           'Afficher la mini-barre flottante',

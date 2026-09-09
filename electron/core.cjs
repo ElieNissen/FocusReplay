@@ -32,6 +32,7 @@ const DEFAULTS = Object.freeze({
   appRules: {},
   siteRules: {},
   browserDomains: false,
+  driftPromptEnabled: false,
 });
 const DEFAULT_REWARDS = [
   { id: 'stretch', name: 'Se lever et souffler', minutes: 5, cost: 25 },
@@ -126,6 +127,7 @@ function validateSettings(input, previous = DEFAULTS) {
         'browserHints',
         'browserDomains',
         'distractionReminder',
+        'driftPromptEnabled',
         'cameraEnabled',
         'rewardsEnabled',
       ].includes(key)
@@ -303,6 +305,51 @@ class Recorder extends EventEmitter {
       s.events.push({ at: this.now(), type: s.status === 'paused' ? 'pause' : 'resume' });
       this.lastTick = this.now();
       this.nextCapture = this.now();
+      await this.save();
+      this.changed();
+    });
+  }
+  async recordCheckin(prompt, action, text) {
+    return this.run(async () => {
+      const s = this.active;
+      if (
+        !s ||
+        s.id !== prompt.sessionId ||
+        this.systemPaused ||
+        (prompt.kind === 'reason' ? s.status !== 'paused' : s.status !== 'recording')
+      )
+        throw new Error('Ce rappel n’est plus actif.');
+      if (
+        typeof text !== 'string' ||
+        text.length > 500 ||
+        !['answer', 'pause', 'dismiss'].includes(action)
+      )
+        throw new Error('Réponse invalide.');
+      if (s.events.some((e) => e.id === prompt.id)) return;
+      const at = this.now();
+      if (action === 'pause') {
+        s.status = 'paused';
+        this.data.pauseTimer = {
+          name: 'Pause sans limite',
+          minutes: null,
+          startedAt: at,
+          endsAt: null,
+          notified: false,
+        };
+        this.data.wallet.activeBreak = null;
+        s.events.push({ at, type: 'pause' });
+      }
+      s.events.push({
+        id: prompt.id,
+        at,
+        promptedAt: prompt.at,
+        type: 'checkin',
+        kind: prompt.kind,
+        action,
+        text: action === 'dismiss' ? '' : text.trim(),
+        app: prompt.app,
+        domain: prompt.domain,
+      });
       await this.save();
       this.changed();
     });

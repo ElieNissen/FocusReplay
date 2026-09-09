@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ZoomIn, ZoomOut } from 'lucide-react';
+import { ZoomIn, ZoomOut, MessageCircle } from 'lucide-react';
 import { shortTime, duration, frameAt } from './lib.mjs';
 import { placeLabels } from './timeline-layout.mjs';
 
 export default function Timeline({
   frames,
+  checkins = [],
   segments,
   start,
   end,
@@ -153,6 +154,26 @@ export default function Timeline({
                 ),
             )}
           </div>
+          {checkins
+            .filter((e) => e.at >= start && e.at <= end)
+            .map((e) => (
+              <button
+                key={e.id}
+                className="checkin-marker"
+                style={{
+                  left: Math.max(11, Math.min(width - 11, ((e.at - start) / span) * width)),
+                }}
+                aria-label={'Repère à ' + shortTime(e.at)}
+                title={shortTime(e.at) + ' · ' + (e.text || 'Arrêt du travail')}
+                onClick={() => {
+                  seek(e.at);
+                  const history = document.querySelector('.checkin-history');
+                  if (history) history.open = true;
+                }}
+              >
+                <MessageCircle size={13} />
+              </button>
+            ))}
           <div className="activity-track" aria-hidden="true">
             {visible.map((a, i) => (
               <span
