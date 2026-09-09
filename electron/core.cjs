@@ -18,6 +18,8 @@ const DEFAULTS = Object.freeze({
   spotifyDevice: '',
   musicSeconds: 0,
   volume: 0.5,
+  soundEnabled: true,
+  soundVolume: 0.3,
   reminderMinutes: 15,
   widget: false,
   theme: 'dark',
@@ -75,6 +77,7 @@ function validateSettings(input, previous = DEFAULTS) {
     quality: [40, 90],
     musicSeconds: [0, 600],
     volume: [0, 1],
+    soundVolume: [0, 1],
     reminderMinutes: [0, 120],
     pointsPerHour: [1, 1000],
   };
@@ -114,10 +117,11 @@ function validateSettings(input, previous = DEFAULTS) {
         value > bounds[key][1]
       )
         throw new Error('Réglage invalide : ' + key);
-      s[key] = key === 'volume' ? value : Math.round(value);
+      s[key] = ['volume', 'soundVolume'].includes(key) ? value : Math.round(value);
     } else if (
       [
         'musicEnabled',
+        'soundEnabled',
         'widget',
         'browserHints',
         'browserDomains',

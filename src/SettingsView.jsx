@@ -168,6 +168,15 @@ export default function SettingsView({ settings, data, busy, act, onBack, musicS
       </section>
       <MusicSettings data={data} settings={settings} act={act} busy={busy} status={musicStatus} />
       <section className="settings-section">
+        <h2><Music2 size={19} /> Sons</h2>
+        {toggle('soundEnabled', 'Sons de l’interface')}
+        <label className="setting-row"><strong>Volume des sons</strong>
+          <input aria-label="Volume des sons" type="range" min="0" max="1" step="0.05"
+            disabled={!settings.soundEnabled || busy} value={settings.soundVolume}
+            onChange={(e) => save('soundVolume', Number(e.target.value))} />
+        </label>
+      </section>
+      <section className="settings-section">
         <h2>
           <Eye size={19} /> Suivi
         </h2>

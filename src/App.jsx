@@ -50,6 +50,7 @@ import { useCamera } from './useCamera';
 import { Rewards, BreakBanner } from './Rewards';
 import { playChime } from './chime';
 import { useMusic } from './useMusic';
+import { useSoundDesign } from './sounds';
 const api = window.focusReplay;
 const imageUrl = (f) => (f ? `focusmedia://capture/${f.id}` : '');
 const sessionName = (s) => `Session de ${shortTime(s.startedAt)}`;
@@ -127,6 +128,7 @@ export default function App() {
   const active = data?.sessions.find((s) => !s.endedAt);
   const paused = active && (active.status === 'paused' || data.systemPaused);
   const settings = data?.settings;
+  useSoundDesign(settings);
   useEffect(() => {
     if (!settings) return;
     const media = matchMedia('(prefers-color-scheme: dark)');
