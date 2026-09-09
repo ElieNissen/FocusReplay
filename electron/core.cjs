@@ -41,6 +41,8 @@ const DEFAULT_REWARDS = [
 ];
 function newWallet() {
   return {
+    unit: 'work-minutes',
+    milestone: 0,
     earned: 0,
     spent: 0,
     workMs: 0,
@@ -212,6 +214,19 @@ class Recorder extends EventEmitter {
         );
     }
     this.data.wallet ||= newWallet();
+    const wallet = this.data.wallet;
+    if (wallet.unit !== 'work-minutes') {
+      const factor = 60 / this.data.settings.pointsPerHour;
+      wallet.earned *= factor;
+      wallet.spent *= factor;
+      for (const reward of wallet.rewards)
+        reward.cost = Math.max(1, Math.ceil(reward.cost * factor));
+      for (const reward of wallet.redemptions)
+        reward.cost = Math.max(1, Math.ceil(reward.cost * factor));
+      wallet.unit = 'work-minutes';
+      wallet.milestone =
+        [25, 60, 120, 240, 480].filter((n) => wallet.workMs >= n * 60000).at(-1) || 0;
+    }
     this.applyRules();
     this.data.pauseTimer = null;
     for (const s of this.data.sessions)
@@ -494,8 +509,15 @@ class Recorder extends EventEmitter {
             cat !== 'idle' &&
             (cat === 'work' || this.data.settings.earnMode === 'active')
           ) {
-            wallet.earned += (elapsed / 3600000) * this.data.settings.pointsPerHour;
+            wallet.earned += elapsed / 60000;
             wallet.workMs += elapsed;
+            const milestone =
+              [25, 60, 120, 240, 480].filter((n) => wallet.workMs >= n * 60000).at(-1) || 0;
+            if (milestone > (wallet.milestone || 0)) {
+              wallet.milestone = milestone;
+              await this.save();
+              this.emit('milestone', { minutes: milestone });
+            }
           }
         }
         if (at >= this.nextCapture) {
@@ -641,7 +663,7 @@ class Recorder extends EventEmitter {
         throw new Error('Récompense indisponible.');
       if (w.activeBreak) throw new Error('Terminez la pause en cours avant une autre récompense.');
       if (Math.floor(w.earned - w.spent + 1e-8) < reward.cost)
-        throw new Error('Pas encore assez de points.');
+        throw new Error('Encore un peu de temps de travail avant cette récompense.');
       this.data.pauseTimer = null;
       w.spent += reward.cost;
       w.activeBreak = {

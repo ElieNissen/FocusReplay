@@ -1905,3 +1905,28 @@ strong {
 .app-stat {
   grid-template-columns: 20px minmax(100px, 1fr) 2fr auto auto;
 }
+.milestones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0 28px;
+}
+.milestones > span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 20px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.milestones > span.achieved {
+  color: var(--work);
+  border-color: var(--work);
+}
+.milestones > strong {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 500;
+}

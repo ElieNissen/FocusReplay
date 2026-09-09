@@ -34,7 +34,6 @@ export function BreakBanner({ wallet, pauseTimer, clock, act }) {
 export function Rewards({ data, clock, act, busy, onBack }) {
   const [edit, setEdit] = useState(null),
     [redeem, setRedeem] = useState(null),
-    [rate, setRate] = useState(data.settings.pointsPerHour),
     [remove, setRemove] = useState(null);
   const api = window.focusReplay,
     wallet = data.wallet,
@@ -53,11 +52,10 @@ export function Rewards({ data, clock, act, busy, onBack }) {
       </div>
       <label className="setting-row">
         <span>
-          <strong>Activer les points</strong>
-          <small>Facultatif. Vous pouvez toujours prendre une pause sans dépenser de points.</small>
+          <strong>Activer les récompenses</strong>
         </span>
         <Toggle
-          aria-label="Activer les points"
+          aria-label="Activer les récompenses"
           className="toggle"
           type="checkbox"
           checked={settings.rewardsEnabled}
@@ -71,49 +69,25 @@ export function Rewards({ data, clock, act, busy, onBack }) {
         <div>
           <strong>
             {balance}
-            <small> points disponibles</small>
+            <small> min de travail disponibles</small>
           </strong>
           <p>{duration(wallet.workMs)} comptabilisées depuis l’activation.</p>
         </div>
         {next && (
           <span className="next-reward">
-            Encore {next.cost - balance} points pour
+            Encore {next.cost - balance} min de travail pour
             <br />
             <strong>{next.name}</strong>
           </span>
         )}
       </div>
       <section className="settings-section">
-        <h2>Une règle simple</h2>
-        <form
-          className="earning-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            act(() => api.settings({ pointsPerHour: Number(rate) }));
-          }}
-        >
-          <label>
-            1 heure comptabilisée ={' '}
-            <input
-              aria-label="Points gagnés par heure"
-              type="number"
-              min="1"
-              max="1000"
-              value={rate}
-              onChange={(e) => setRate(e.target.value)}
-            />{' '}
-            points
-          </label>
-          <button disabled={busy || Number(rate) === settings.pointsPerHour} type="submit">
-            Appliquer
-          </button>
-        </form>
         <label className="setting-row">
           <span>
-            <strong>Temps qui donne des points</strong>
+            <strong>Temps comptabilisé</strong>
           </span>
           <select
-            aria-label="Temps qui donne des points"
+            aria-label="Temps comptabilisé"
             value={settings.earnMode}
             onChange={(e) => act(() => api.settings({ earnMode: e.target.value }))}
           >
@@ -122,6 +96,17 @@ export function Rewards({ data, clock, act, busy, onBack }) {
           </select>
         </label>
       </section>
+      <div className="milestones" aria-label="Paliers de travail">
+        {[25, 60, 120, 240, 480].map((minutes) => (
+          <span key={minutes} className={wallet.workMs >= minutes * 60000 ? 'achieved' : ''}>
+            {wallet.workMs >= minutes * 60000 && <Check size={14} />}
+            {duration(minutes * 60000)}
+          </span>
+        ))}
+        {wallet.milestone > 0 && (
+          <strong>Bien joué · {duration(wallet.milestone * 60000)} de travail !</strong>
+        )}
+      </div>
       <section className="reward-section">
         <div className="section-title">
           <h2>À vous de choisir</h2>
@@ -140,13 +125,15 @@ export function Rewards({ data, clock, act, busy, onBack }) {
               <div className="reward-description">
                 <strong>{r.name}</strong>
                 <small>
-                  {r.minutes} min · {r.cost} points
+                  {r.cost} min de travail → {r.minutes} min de récompense
                 </small>
               </div>
               <div className="reward-progress">
                 <progress value={Math.min(balance, r.cost)} max={r.cost} />
                 <small>
-                  {balance >= r.cost ? 'Disponible' : `${r.cost - balance} points restants`}
+                  {balance >= r.cost
+                    ? 'Disponible'
+                    : `${r.cost - balance} min de travail restantes`}
                 </small>
               </div>
               <button
@@ -184,8 +171,8 @@ export function Rewards({ data, clock, act, busy, onBack }) {
         {redeem && (
           <div className="notice">
             <span>
-              Utiliser {redeem.cost} points pour {redeem.minutes} minutes de « {redeem.name} » ? La
-              session sera mise en pause.
+              Utiliser {redeem.cost} minutes de travail pour {redeem.minutes} minutes de «{' '}
+              {redeem.name} » ? La session sera mise en pause.
             </span>
             <button onClick={() => setRedeem(null)}>Annuler</button>
             <button
@@ -204,7 +191,9 @@ export function Rewards({ data, clock, act, busy, onBack }) {
         )}
         {remove && (
           <div className="notice">
-            <span>Supprimer « {remove.name} » de vos récompenses ? Vos points sont conservés.</span>
+            <span>
+              Supprimer « {remove.name} » de vos récompenses ? Votre temps cumulé est conservé.
+            </span>
             <button onClick={() => setRemove(null)}>Garder</button>
             <button
               disabled={busy}
@@ -261,9 +250,9 @@ export function Rewards({ data, clock, act, busy, onBack }) {
                 />
               </label>
               <label>
-                Coût en points
+                Minutes de travail nécessaires
                 <input
-                  aria-label="Coût de la récompense"
+                  aria-label="Minutes de travail nécessaires"
                   type="number"
                   min="1"
                   max="100000"
@@ -292,7 +281,8 @@ export function Rewards({ data, clock, act, busy, onBack }) {
               <div key={i}>
                 <span>{r.name}</span>
                 <small>
-                  {r.minutes} min · {r.cost} pts · {new Date(r.at).toLocaleDateString('fr-FR')}
+                  {r.minutes} min · {r.cost} min travaillées ·{' '}
+                  {new Date(r.at).toLocaleDateString('fr-FR')}
                 </small>
               </div>
             ))}

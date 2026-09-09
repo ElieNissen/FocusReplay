@@ -637,6 +637,10 @@ else {
         updateTray();
         updateWidget();
       });
+      recorder.on('milestone', ({ minutes }) => {
+        notify('Bien joué !', `${minutes} minutes de travail cumulées.`);
+        send('focus:checkin-sound');
+      });
       recorder.on('break-ended', (reward) => {
         notify(
           'Pause terminée',

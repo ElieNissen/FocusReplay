@@ -466,14 +466,13 @@ try {
   await page.getByRole('button', { name: 'Terminer', exact: true }).click();
   await expect(page.getByText('Caméra autorisée', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Pauses & récompenses', exact: true }).click();
-  await page.getByRole('checkbox', { name: 'Activer les points' }).click();
-  await expect(page.getByRole('checkbox', { name: 'Activer les points' })).toBeChecked();
-  await page.getByRole('spinbutton', { name: 'Points gagnés par heure' }).fill('120');
-  await page.getByRole('button', { name: 'Appliquer', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Activer les récompenses' }).click();
+  await expect(page.getByRole('checkbox', { name: 'Activer les récompenses' })).toBeChecked();
+  await expect(page.getByText('min de travail disponibles', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
   await page.getByRole('textbox', { name: 'Nom de la récompense' }).fill('Une promenade');
   await page.getByRole('spinbutton', { name: 'Durée de la récompense' }).fill('15');
-  await page.getByRole('spinbutton', { name: 'Coût de la récompense' }).fill('30');
+  await page.getByRole('spinbutton', { name: 'Minutes de travail nécessaires' }).fill('30');
   await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await expect(page.getByText('Une promenade', { exact: true })).toBeVisible();
   await page.screenshot({ path: path.join(root, 'rewards.png'), fullPage: true });

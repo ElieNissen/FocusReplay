@@ -519,3 +519,41 @@ test('Windows notification inline reply and stop action dispatch their original 
   ]);
   assert.deepEqual(overlays, ['original', 'original']);
 });
+
+test('legacy point balances convert once to work minutes and milestones never repeat', async (t) => {
+  const f = await fixture(t);
+  f.r.data.settings.pointsPerHour = 120;
+  delete f.r.data.wallet.unit;
+  f.r.data.wallet.earned = 100;
+  f.r.data.wallet.spent = 20;
+  f.r.data.wallet.rewards[0].cost = 50;
+  await f.r.save();
+  const r = new Recorder({
+    dir: f.dir,
+    now: () => f.r.now(),
+    activity: () => ({ app: 'Editor', category: 'work' }),
+    capture: async () => ({ bytes: Buffer.from('jpeg'), width: 1000, height: 600 }),
+  });
+  await r.init();
+  assert.equal(r.data.wallet.unit, 'work-minutes');
+  assert.equal(r.data.wallet.earned, 50);
+  assert.equal(r.data.wallet.spent, 10);
+  assert.equal(r.data.wallet.rewards[0].cost, 25);
+  await r.settings({ rewardsEnabled: true });
+  r.data.wallet.workMs = 25 * 60000 - 2000;
+  let messages = 0;
+  r.on('milestone', () => messages++);
+  await r.start();
+  f.advance(2000);
+  await r.tick();
+  f.advance(2000);
+  await r.tick();
+  assert.equal(messages, 1);
+  assert.equal(r.data.wallet.milestone, 25);
+  assert.ok(Math.abs(r.data.wallet.earned - (50 + 4 / 60)) < 1e-8);
+  await r.stop();
+  const loaded = new Recorder({ dir: f.dir });
+  await loaded.init();
+  assert.equal(loaded.data.wallet.milestone, 25);
+  assert.equal(loaded.data.wallet.earned, r.data.wallet.earned);
+});
