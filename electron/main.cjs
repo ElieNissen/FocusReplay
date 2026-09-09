@@ -53,6 +53,7 @@ protocol.registerSchemesAsPrivileged([
     privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
   },
 ]);
+const iconAttempts = new Map();
 let checkins, checkinWindow, checkinNotification;
 let main,
   widget,
@@ -825,6 +826,31 @@ else {
         safe(async () => {
           await recorder.tick();
           checkins.sync();
+          const foreground = tracker?.current();
+          if (
+            foreground?.executable &&
+            iconAttempts.get(foreground.app) !== foreground.executable
+          ) {
+            iconAttempts.set(foreground.app, foreground.executable);
+            if (iconAttempts.size > 200) iconAttempts.delete(iconAttempts.keys().next().value);
+            try {
+              const image = await app.getFileIcon(foreground.executable, { size: 'small' });
+              if (!image.isEmpty()) {
+                await recorder.run(async () => {
+                  recorder.data.appIcons ||= {};
+                  recorder.data.appIcons[foreground.app.toLowerCase()] = image
+                    .resize({ width: 24, height: 24 })
+                    .toDataURL();
+                  const keys = Object.keys(recorder.data.appIcons);
+                  if (keys.length > 200) delete recorder.data.appIcons[keys[0]];
+                  await recorder.save();
+                  recorder.changed();
+                });
+              }
+            } catch {
+              /* Some protected apps do not expose an icon. */
+            }
+          }
           const s = recorder.active,
             settings = recorder.data.settings,
             now = Date.now();

@@ -46,7 +46,9 @@ function Get-BrowserDomain {
 while ($true) {
   try {
     $foregroundId = [ForegroundApp]::Id()
-    $foregroundName = (Get-Process -Id $foregroundId -ErrorAction Stop).ProcessName
+    $foregroundProcess = Get-Process -Id $foregroundId -ErrorAction Stop
+    $foregroundName = $foregroundProcess.ProcessName
+    $executable = $foregroundProcess.Path
     $hint = 'unknown'
     $domain = ''
     if ($env:FOCUS_BROWSER_DOMAINS -eq '1' -and $foregroundName -match '^(chrome|msedge|firefox|brave|opera)$') { $domain = Get-BrowserDomain }
@@ -58,7 +60,7 @@ while ($true) {
       $windowText = $null
     }
     if ([ForegroundApp]::Id() -ne $foregroundId) { throw 'Foreground changed' }
-    @{ name = $foregroundName; hint = $hint; domain = $domain } | ConvertTo-Json -Compress
+    @{ name = $foregroundName; hint = $hint; domain = $domain; executable = $executable } | ConvertTo-Json -Compress
   } catch { '{"name":null}' }
   Start-Sleep -Seconds 2
 }

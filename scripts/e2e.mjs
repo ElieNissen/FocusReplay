@@ -149,9 +149,12 @@ try {
   await expect(page.getByRole('heading', { name: 'Votre journée', exact: true })).toBeVisible();
   await expect(page.locator('.filmstrip img').first()).toBeVisible();
   await page.locator('.image-surface img').evaluate((img) => img.decode());
-  await expect(page.locator('.software-callout').filter({ hasText: 'Terminal' })).toBeVisible();
-  await expect(page.locator('.software-callout').filter({ hasText: 'Firefox' })).toBeVisible();
-  await page.locator('.software-callout').filter({ hasText: 'Firefox' }).click();
+  await expect(page.locator('.software-callout')).toHaveCount(0);
+  await page.locator('.overview-block[title*="Firefox"]').first().click();
+  await expect(
+    page.locator('.group-breakdown').getByText('Terminal', { exact: true }),
+  ).toBeVisible();
+  await page.locator('.group-breakdown button').filter({ hasText: 'Firefox' }).click();
   await page
     .getByRole('combobox', { name: 'Classement · Firefox', exact: true })
     .selectOption('work');

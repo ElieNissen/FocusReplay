@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import SettingsView from './SettingsView';
 import Timeline from './Timeline';
+import AppIcon from './AppIcon';
+import { sessionGaps } from './activity-overview.mjs';
 import { CheckinHistory } from './CheckinOverlay';
 import {
   Play,
@@ -191,6 +193,15 @@ export default function App() {
     frames.at(-1)?.at || 0,
     ...segments.map((a) => a.to),
     ...checkinEntries.map((e) => e.at),
+    ...sessions
+      .filter((s) => !selectedSession || s.id === selectedSession)
+      .map((s) => Math.min(s.endedAt || clock, new Date(day + 'T23:59:59.999').getTime())),
+  );
+  const gaps = sessionGaps(
+    sessions.filter((s) => !selectedSession || s.id === selectedSession),
+    start,
+    end,
+    clock,
   );
   const playheadTime = follow
     ? end
@@ -239,11 +250,11 @@ export default function App() {
         latest.current.togglePlay();
       }
       if (e.target.tagName === 'INPUT') return;
-      if (e.key === 'ArrowLeft') {
+      if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'q') {
         e.preventDefault();
         latest.current.step(-1);
       }
-      if (e.key === 'ArrowRight') {
+      if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
         e.preventDefault();
         latest.current.step(1);
       }
@@ -647,6 +658,11 @@ export default function App() {
                 <section className="replay-stage" aria-label="Prévisualisation de la capture">
                   <div className="image-scroll">
                     <div className="image-surface" style={{ width: '100%', height: '100%' }}>
+                      {gaps.some((g) => playheadTime >= g.from && playheadTime < g.to) && (
+                        <div className="preview-gap">
+                          {gaps.find((g) => playheadTime >= g.from && playheadTime < g.to)?.label}
+                        </div>
+                      )}
                       <img
                         src={imageUrl(current)}
                         alt={`Capture du ${new Date(current.at).toLocaleDateString('fr-FR')} à ${time(current.at)}, ${current.app}`}
@@ -725,6 +741,8 @@ export default function App() {
                 <Timeline
                   frames={frames}
                   segments={softwareSegments}
+                  gaps={gaps}
+                  icons={data.appIcons}
                   checkins={checkinEntries}
                   start={start}
                   end={end}
@@ -774,6 +792,7 @@ export default function App() {
                   <div className="app-breakdown">
                     {stats.apps.slice(0, 8).map((a, i) => (
                       <div className="app-stat" key={a.name}>
+                        <AppIcon name={a.name} icons={data.appIcons} />
                         <span>{a.name}</span>
                         <div className="app-stat-bar">
                           {Object.entries(a.categories)

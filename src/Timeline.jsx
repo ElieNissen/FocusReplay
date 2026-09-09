@@ -1,12 +1,14 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ZoomIn, ZoomOut, MessageCircle } from 'lucide-react';
-import { shortTime, duration, frameAt } from './lib.mjs';
-import { placeLabels } from './timeline-layout.mjs';
-
+import { shortTime, duration } from './lib.mjs';
+import { groupActivity } from './activity-overview.mjs';
+import AppIcon from './AppIcon';
 export default function Timeline({
   frames,
   checkins = [],
   segments,
+  gaps = [],
+  icons = {},
   start,
   end,
   cursor,
@@ -16,36 +18,27 @@ export default function Timeline({
   settings,
   onRule,
 }) {
-  const scroll = useRef(null);
-  const [editing, setEditing] = useState(null);
-  useEffect(() => {
-    const close = (e) => {
-      if (e.key === 'Escape') setEditing(null);
-    };
-    window.addEventListener('keydown', close);
-    return () => window.removeEventListener('keydown', close);
-  }, []);
-  const [viewport, setViewport] = useState(900);
-  const [offset, setOffset] = useState(0);
-  const span = Math.max(1, end - start);
-  const width = Math.min(viewport, Math.max(180, frames.length * 96)) * zoom;
-  const latest = useRef({});
-  latest.current = { zoom, width, viewport };
+  const scroll = useRef(null),
+    anchor = useRef(null),
+    latest = useRef({});
+  const [viewport, setViewport] = useState(900),
+    [shownZoom, setShownZoom] = useState(zoom);
+  const [group, setGroup] = useState(null),
+    [editing, setEditing] = useState(null);
+  const span = Math.max(1, end - start),
+    base = Math.min(viewport, Math.max(280, frames.length * 96));
+  const width = base * shownZoom;
+  latest.current = { width, zoom, shownZoom };
   useEffect(() => {
     const el = scroll.current;
     const observer = new ResizeObserver(() => setViewport(el.clientWidth));
     observer.observe(el);
-    const wheel = (event) => {
-      if (event.shiftKey) return;
-      event.preventDefault();
-      const { zoom: z, width: w } = latest.current;
-      const next = Math.max(1, Math.min(8, z * (event.deltaY < 0 ? 1.2 : 1 / 1.2)));
-      const x = event.clientX - el.getBoundingClientRect().left;
-      const ratio = (el.scrollLeft + x) / w;
-      setZoom(next);
-      requestAnimationFrame(() => {
-        el.scrollLeft = (ratio * w * next) / z - x;
-      });
+    const wheel = (e) => {
+      if (e.shiftKey) return;
+      e.preventDefault();
+      const x = e.clientX - el.getBoundingClientRect().left;
+      anchor.current = { ratio: (el.scrollLeft + x) / latest.current.width, x };
+      setZoom((z) => Math.max(1, Math.min(8, z * (e.deltaY < 0 ? 1.15 : 1 / 1.15))));
     };
     el.addEventListener('wheel', wheel, { passive: false });
     return () => {
@@ -53,34 +46,75 @@ export default function Timeline({
       el.removeEventListener('wheel', wheel);
     };
   }, [setZoom]);
-  const visible = segments
-    .filter((a) => a.to >= start && a.from <= end)
-    .map((a) => ({
-      ...a,
-      label: a.domain || a.app,
-      x: Math.max(0, ((a.from - start) / span) * width),
-      width: Math.max(2, ((Math.min(end, a.to) - Math.max(start, a.from)) / span) * width),
-    }));
-  const layout = placeLabels(visible, width, offset, viewport);
   useEffect(() => {
-    const main = scroll.current?.closest('main');
-    main?.style.setProperty('--timeline-height', `${234 + layout.rows * 30}px`);
+    const el = scroll.current;
+    if (!anchor.current)
+      anchor.current = {
+        ratio: (el.scrollLeft + el.clientWidth / 2) / latest.current.width,
+        x: el.clientWidth / 2,
+      };
+    const from = latest.current.shownZoom,
+      began = performance.now();
+    let frame;
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const animate = (now) => {
+      const p = reduced ? 1 : Math.min(1, (now - began) / 180);
+      setShownZoom(from + (zoom - from) * (1 - (1 - p) ** 3));
+      if (p < 1) frame = requestAnimationFrame(animate);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [zoom]);
+  useLayoutEffect(() => {
+    if (anchor.current) scroll.current.scrollLeft = anchor.current.ratio * width - anchor.current.x;
+  }, [width]);
+  useEffect(() => {
+    const close = (e) => {
+      if (e.key === 'Escape') {
+        setEditing(null);
+        setGroup(null);
+      }
+    };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, []);
+  useEffect(() => {
+    const main = scroll.current.closest('main');
+    main?.style.setProperty('--timeline-height', '245px');
     return () => main?.style.removeProperty('--timeline-height');
-  }, [layout.rows]);
-  // A compact strip grows with the recording. Each tile represents its true timestamp.
-  const tiles = useMemo(() => {
-    const count = Math.max(1, Math.ceil(width / 96));
-    return Array.from({ length: count }, (_, i) => ({
-      frame: frameAt(frames, start + (span * i) / count),
-      x: (i * width) / count,
-      width: width / count,
-    }));
-  }, [frames, start, span, width]);
-  const ticks = Math.max(2, Math.min(9, Math.floor(width / 130) + 1));
+  }, []);
+  const groups = useMemo(
+    () => groupActivity(segments, start, end, base * zoom, gaps),
+    [segments, start, end, base, zoom, gaps],
+  );
+  const stride = Math.max(
+    1,
+    2 ** Math.ceil(Math.log2(Math.max(1, frames.length / Math.max(1, (base * zoom) / 100)))),
+  );
+  const samples = frames.filter((_, i) => i % stride === 0);
+  const position = (from, to) => ({
+    left: ((from - start) / span) * width,
+    width: Math.max(0, ((to - from) / span) * width),
+  });
   return (
-    <section className="timeline-section" aria-label="Timeline interactive">
+    <section className="timeline-section overview-timeline" aria-label="Timeline interactive">
       {editing && (
-        <div className="timeline-rule" role="region" aria-label="Classement depuis la timeline">
+        <div
+          className="timeline-rule overview-detail"
+          role="region"
+          aria-label="Classement depuis la timeline"
+        >
+          {group && (
+            <div className="group-breakdown">
+              {group.apps.map((a) => (
+                <button key={a.app + a.domain + a.category} onClick={() => setEditing(a)}>
+                  <AppIcon name={a.app} icons={icons} />
+                  <span>{a.domain || a.app}</span>
+                  <strong>{duration(a.ms)}</strong>
+                </button>
+              ))}
+            </div>
+          )}
           <strong>{editing.domain || editing.app}</strong>
           {[
             ['appRules', editing.app.toLowerCase(), editing.app],
@@ -100,7 +134,13 @@ export default function Timeline({
               </select>
             </label>
           ))}
-          <button onClick={() => setEditing(null)} aria-label="Fermer le classement">
+          <button
+            onClick={() => {
+              setEditing(null);
+              setGroup(null);
+            }}
+            aria-label="Fermer le classement"
+          >
             ×
           </button>
         </div>
@@ -130,29 +170,83 @@ export default function Timeline({
       <div
         className="timeline-scroll"
         ref={scroll}
-        onScroll={(e) => setOffset(e.currentTarget.scrollLeft)}
-        title="Molette : zoom · Maj + molette : défilement"
+        title="Molette : zoom · Maj + molette : défilement · Q/D ou flèches : image précédente/suivante"
       >
-        <div className="timeline-inner" style={{ width, height: 174 + layout.rows * 30 }}>
+        <div className="timeline-inner" style={{ width, height: 190 }}>
           <div className="ruler">
-            {Array.from({ length: ticks }, (_, i) => (
-              <span key={i}>{shortTime(start + (span * i) / (ticks - 1))}</span>
+            {Array.from({ length: 9 }, (_, i) => (
+              <span key={i}>{shortTime(start + (span * i) / 8)}</span>
             ))}
           </div>
           <div className="filmstrip">
-            {tiles.map(
-              (tile, i) =>
-                tile.frame && (
-                  <img
-                    key={i}
-                    src={`focusmedia://capture/${tile.frame.id}`}
-                    alt=""
-                    loading="lazy"
-                    draggable="false"
-                    style={{ left: tile.x, width: tile.width + 1 }}
-                  />
-                ),
-            )}
+            {samples.map((f, i) => (
+              <img
+                key={f.id}
+                src={'focusmedia://capture/' + f.id}
+                alt=""
+                draggable="false"
+                style={position(f.at, samples[i + 1]?.at || end)}
+              />
+            ))}
+            {gaps.map((g, i) => (
+              <div
+                key={i}
+                className="timeline-gap"
+                style={position(g.from, g.to)}
+                title={g.label + ' · ' + duration(g.to - g.from)}
+              >
+                <span>{g.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="activity-track" aria-hidden="true">
+            {segments.map((a, i) => (
+              <span
+                key={i}
+                className={a.category || 'unknown'}
+                style={position(Math.max(start, a.from), Math.min(end, a.to))}
+              />
+            ))}
+          </div>
+          <div className="overview-lane" aria-label="Logiciels utilisés sur la timeline">
+            {groups.map((g) => {
+              const a = g.apps[0],
+                px = ((g.to - g.from) / span) * width;
+              return (
+                <button
+                  key={g.from}
+                  className={'overview-block ' + a.category}
+                  style={position(g.from, g.to)}
+                  aria-label={(a.domain || a.app) + ' · ' + duration(a.ms)}
+                  title={
+                    shortTime(g.from) +
+                    '–' +
+                    shortTime(g.to) +
+                    '\n' +
+                    g.apps.map((r) => (r.domain || r.app) + ' · ' + duration(r.ms)).join('\n')
+                  }
+                  onClick={() => {
+                    seek(g.from);
+                    setGroup(g);
+                    setEditing(a);
+                  }}
+                >
+                  {px > 35 && <AppIcon name={a.app} icons={icons} />}
+                  {px > 90 && (
+                    <span>
+                      <strong>{a.domain || a.app}</strong>
+                      <small>
+                        {duration(a.ms)}
+                        {g.apps.length > 1 && ' · +' + (g.apps.length - 1)}
+                      </small>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            {gaps.map((g, i) => (
+              <div key={i} className="overview-gap" style={position(g.from, g.to)} />
+            ))}
           </div>
           {checkins
             .filter((e) => e.at >= start && e.at <= end)
@@ -163,69 +257,17 @@ export default function Timeline({
                 style={{
                   left: Math.max(11, Math.min(width - 11, ((e.at - start) / span) * width)),
                 }}
+                title={e.text || 'Arrêt du travail'}
                 aria-label={'Repère à ' + shortTime(e.at)}
-                title={shortTime(e.at) + ' · ' + (e.text || 'Arrêt du travail')}
                 onClick={() => {
                   seek(e.at);
-                  const history = document.querySelector('.checkin-history');
-                  if (history) history.open = true;
+                  const h = document.querySelector('.checkin-history');
+                  if (h) h.open = true;
                 }}
               >
                 <MessageCircle size={13} />
               </button>
             ))}
-          <div className="activity-track" aria-hidden="true">
-            {visible.map((a, i) => (
-              <span
-                key={i}
-                className={a.category || 'unknown'}
-                style={{ left: a.x, width: a.width }}
-              />
-            ))}
-          </div>
-          <div
-            className="software-lane"
-            aria-label="Logiciels utilisés sur la timeline"
-            style={{ height: 38 + layout.rows * 30 }}
-          >
-            {layout.items.map((a, i) => (
-              <React.Fragment key={i}>
-                <button
-                  className={`software-segment ${a.category || 'unknown'}`}
-                  style={{ left: a.x, width: a.width }}
-                  aria-label={`${a.domain || a.app} · ${duration(a.ms)}`}
-                  title={`${a.app} · ${shortTime(a.from)}–${shortTime(a.to)} · ${duration(a.ms)}`}
-                  onClick={() => {
-                    seek(Math.max(start, a.from));
-                    setEditing(a);
-                  }}
-                >
-                  {!a.callout && <span>{a.label}</span>}
-                </button>
-                {a.callout && (
-                  <>
-                    <span
-                      className="label-leader"
-                      style={{ left: a.x + a.width / 2, height: 13 + a.row * 30 }}
-                    />
-                    <button
-                      className="software-callout"
-                      style={{ left: a.labelX, top: 35 + a.row * 30, width: a.labelWidth }}
-                      title={`${a.app} · ${duration(a.ms)}`}
-                      onClick={() => {
-                        seek(Math.max(start, a.from));
-                        setEditing(a);
-                      }}
-                    >
-                      <i className={a.category || 'unknown'} />
-                      {a.label}
-                      <small>{duration(a.ms)}</small>
-                    </button>
-                  </>
-                )}
-              </React.Fragment>
-            ))}
-          </div>
           <div className="playhead" style={{ left: ((cursor - start) / span) * width }}>
             <span />
           </div>

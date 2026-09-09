@@ -55,7 +55,11 @@ export function useSoundDesign(value) {
       if (event.target.matches?.('select, input[type="range"]')) playSound();
     };
     const key = (event) => {
-      if (!['Space', 'ArrowLeft', 'ArrowRight'].includes(event.code) || event.repeat) return;
+      if (
+        !['Space', 'ArrowLeft', 'ArrowRight', 'KeyQ', 'KeyD'].includes(event.code) ||
+        event.repeat
+      )
+        return;
       queueMicrotask(() => {
         if (event.defaultPrevented) playSound();
       });

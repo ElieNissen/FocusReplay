@@ -1794,3 +1794,114 @@ strong {
 .checkin-marker {
   min-height: 22px;
 }
+.app-icon {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  object-fit: contain;
+}
+.overview-timeline .timeline-inner {
+  min-width: 0;
+}
+.overview-timeline .filmstrip,
+.overview-timeline .filmstrip img {
+  height: 76px;
+}
+.overview-timeline .filmstrip img {
+  opacity: 0.72;
+}
+.overview-timeline .scrubber {
+  height: 104px;
+}
+.overview-lane {
+  position: relative;
+  height: 65px;
+  margin-top: 7px;
+}
+.overview-block {
+  position: absolute;
+  top: 0;
+  height: 58px;
+  min-height: 0;
+  border-radius: 4px;
+  padding: 8px;
+  overflow: hidden;
+  justify-content: flex-start;
+  border: 0;
+  border-right: 2px solid var(--bg);
+  background: var(--panel);
+}
+.overview-block.work {
+  box-shadow: inset 0 2px var(--work);
+}
+.overview-block.distraction {
+  box-shadow: inset 0 2px var(--distraction);
+}
+.overview-block.unknown {
+  box-shadow: inset 0 2px var(--unknown);
+}
+.overview-block span {
+  display: grid;
+  min-width: 0;
+  text-align: left;
+  gap: 4px;
+}
+.overview-block strong {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  font-size: 12px;
+}
+.overview-block small {
+  font-size: 11px;
+}
+.timeline-gap {
+  position: absolute;
+  inset-block: 0;
+  background: var(--sidebar);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-inline: 1px solid var(--border);
+}
+.timeline-gap span {
+  font-size: 11px;
+  padding: 5px;
+  white-space: nowrap;
+}
+.overview-gap {
+  position: absolute;
+  height: 58px;
+  background: var(--sidebar);
+  opacity: 0.5;
+}
+.preview-gap {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  background: var(--stage);
+  color: var(--muted);
+  font-size: 22px;
+}
+.overview-detail {
+  flex-wrap: wrap;
+  max-height: 300px;
+  overflow: auto;
+}
+.group-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 6px;
+}
+.group-breakdown button {
+  font-size: 12px;
+}
+.group-breakdown strong {
+  color: var(--muted);
+}
+.app-stat {
+  grid-template-columns: 20px minmax(100px, 1fr) 2fr auto auto;
+}
