@@ -428,7 +428,9 @@ test('check-in replies persist; stopped-work pauses once and stale replies canno
   });
   assert.equal(c.request('work'), true);
   const p = c.pending;
-  await c.respond(p.id, 'answer', '  Préparer une maquette  ');
+  const saving = c.respond(p.id, 'answer', '  Préparer une maquette  ');
+  assert.equal(c.request('work', true), false);
+  await saving;
   assert.equal(f.r.active.events.at(-1).text, 'Préparer une maquette');
   assert.equal(f.r.active.status, 'recording');
   assert.equal(c.request('work'), false);

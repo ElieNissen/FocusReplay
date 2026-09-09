@@ -402,6 +402,9 @@ try {
     .toBeGreaterThan(before);
   // Exercise the actual isolated overlay, its restricted IPC and persisted reasons.
   const openPrompt = async () => {
+    await expect
+      .poll(() => page.evaluate(() => window.focusReplay.checkinState().then((s) => s.busy)))
+      .toBe(false);
     const opened = app.waitForEvent('window');
     expect(await page.evaluate(() => window.focusReplay.checkinPreview())).toBe(true);
     const overlay = await opened;

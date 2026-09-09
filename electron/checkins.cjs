@@ -9,6 +9,7 @@ class Checkins {
   state() {
     return {
       prompt: this.pending,
+      busy: Boolean(this.responding),
       settings: {
         theme: this.recorder.data.settings.theme,
         soundEnabled: this.recorder.data.settings.soundEnabled,
@@ -41,6 +42,7 @@ class Checkins {
       s.status !== 'recording' ||
       this.recorder.systemPaused ||
       this.pending ||
+      this.responding ||
       (!force && this.now() - this.lastPrompt < 10 * 60000)
     )
       return false;
@@ -68,9 +70,11 @@ class Checkins {
       throw new Error('Écrivez une réponse ou choisissez Plus tard.');
     // Claim the prompt before awaiting disk I/O: double clicks cannot pause twice.
     this.pending = null;
+    this.responding = true;
     try {
       await this.recorder.recordCheckin(p, action, text);
     } catch (error) {
+      this.responding = false;
       this.pending = p;
       this.sync();
       throw error;
@@ -87,6 +91,7 @@ class Checkins {
         this.present(this.pending, true, true);
       }
     }
+    this.responding = false;
     return this.state();
   }
 }
