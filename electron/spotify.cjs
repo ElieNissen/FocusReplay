@@ -4,6 +4,21 @@ const http = require('node:http');
 const { randomBytes, createHash } = require('node:crypto');
 const { setTimeout: delay } = require('node:timers/promises');
 const REDIRECT = 'http://127.0.0.1:43827/callback';
+const { clientId: sharedClientId } = require('./spotify-app.json');
+const { spotifyUri } = require('./music-config.cjs');
+function catalogItem(item) {
+  return {
+    uri: item.uri,
+    name: String(item.name || 'Sans titre').slice(0, 300),
+    subtitle: String(
+      item.artists?.map((a) => a.name).join(', ') || item.owner?.display_name || 'Playlist',
+    ).slice(0, 500),
+    image:
+      (item.album?.images || item.images || []).find((i) =>
+        /^https:\/\/i\.scdn\.co\/image\/[a-zA-Z0-9]+$/.test(i.url),
+      )?.url || '',
+  };
+}
 class Spotify {
   constructor({ dir, encryption, open, fetcher = fetch, onChange = () => {} }) {
     Object.assign(this, { encryption, open, fetcher, onChange });
@@ -16,6 +31,10 @@ class Spotify {
       connected: Boolean(this.auth?.refresh_token),
       connecting: Boolean(this.cancelLogin),
       redirect: REDIRECT,
+      sharedClient: Boolean(sharedClientId),
+      canReconnect: Boolean(this.auth?.clientId || sharedClientId),
+      libraryAccess: Boolean(this.auth?.scope?.includes('playlist-read-private')),
+      connectionMode: this.auth?.clientId === sharedClientId ? 'invitation' : 'personal',
     };
   }
   async init() {
@@ -55,6 +74,7 @@ class Spotify {
     return { ...value, expiresAt: Date.now() + value.expires_in * 1000 };
   }
   async connect(clientId) {
+    clientId ||= this.auth?.clientId || sharedClientId;
     if (this.cancelLogin) throw new Error('Une connexion Spotify est déjà ouverte.');
     if (typeof clientId !== 'string' || !/^[a-f0-9]{32}$/i.test(clientId.trim()))
       throw new Error('Collez le Client ID de votre application Spotify.');
@@ -103,7 +123,8 @@ class Spotify {
             code_challenge_method: 'S256',
             code_challenge: createHash('sha256').update(verifier).digest('base64url'),
             state,
-            scope: 'user-read-playback-state user-modify-playback-state',
+            scope:
+              'user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative',
           });
           this.open('https://accounts.spotify.com/authorize?' + query).catch(() =>
             reject(new Error('Impossible d’ouvrir la connexion Spotify.')),
@@ -167,7 +188,12 @@ class Spotify {
     return this.refreshing;
   }
   async request(endpoint, method = 'GET', body, retry = true) {
-    if (!/^\/me\/player(?:[/?]|$)/.test(endpoint)) throw new Error('Commande Spotify invalide.');
+    if (
+      !/^\/(?:me\/player(?:[/?]|$)|me\/playlists\?|search\?|(?:tracks|playlists)\/[a-zA-Z0-9]{22}$)/.test(
+        endpoint,
+      )
+    )
+      throw new Error('Commande Spotify invalide.');
     const token = await this.access();
     const response = await this.fetcher('https://api.spotify.com/v1' + endpoint, {
       method,
@@ -182,7 +208,7 @@ class Spotify {
     }
     if (response.status === 403)
       throw new Error(
-        'Spotify refuse la lecture. Vérifiez Premium et les utilisateurs autorisés de votre application Spotify.',
+        'Spotify refuse l’accès. Vérifiez Premium. L’accès test FocusReplay exige une invitation ; sinon utilisez votre configuration Spotify personnelle.',
       );
     if (response.status === 404)
       throw new Error('Ouvrez Spotify sur le PC et lancez un titre une première fois.');
@@ -191,6 +217,46 @@ class Spotify {
     if (!response.ok)
       throw new Error('Spotify est indisponible. Réessayez après avoir vérifié la connexion.');
     return response.status === 204 ? null : response.json();
+  }
+  async search(query, offset = 0) {
+    if (
+      typeof query !== 'string' ||
+      !query.trim() ||
+      query.length > 200 ||
+      !Number.isInteger(offset) ||
+      offset < 0 ||
+      offset > 1000
+    )
+      throw new Error('Recherche invalide.');
+    const result = await this.request(
+      '/search?' +
+        new URLSearchParams({
+          q: query.trim(),
+          type: 'track',
+          limit: '10',
+          offset: String(offset),
+        }),
+    );
+    return {
+      items: (result.tracks?.items || []).filter((i) => i?.uri).map(catalogItem),
+      more: Boolean(result.tracks?.next),
+    };
+  }
+  async playlists(offset = 0) {
+    if (!Number.isInteger(offset) || offset < 0 || offset > 100000)
+      throw new Error('Page invalide.');
+    if (!this.status().libraryAccess)
+      throw new Error('Reconnectez Spotify pour autoriser l’accès à vos playlists.');
+    const result = await this.request('/me/playlists?limit=50&offset=' + offset);
+    return {
+      items: (result.items || []).filter((i) => i?.uri).map(catalogItem),
+      more: Boolean(result.next),
+    };
+  }
+  async resolve(value, kind) {
+    if (!['track', 'playlist'].includes(kind)) throw new Error('Type invalide.');
+    const uri = spotifyUri(value, kind);
+    return catalogItem(await this.request('/' + kind + 's/' + uri.split(':')[2]));
   }
   async play(selection, signal, deviceId) {
     signal.throwIfAborted();

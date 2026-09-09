@@ -25,6 +25,8 @@ const { startTracker } = require('./tracker.cjs');
 const { exportVideo } = require('./export.cjs');
 const { exportName } = require('./export-overlay.cjs');
 const { Spotify } = require('./spotify.cjs');
+const { audioPath, importAudio, removeAudio } = require('./local-music.cjs');
+const { spotifyUri } = require('./music-config.cjs');
 const { MusicDirector } = require('./music-director.cjs');
 const { selection, phases } = require('./music-config.cjs');
 
@@ -72,7 +74,8 @@ let spotify,
 const musicSnapshot = () => ({ ...musicStatus, spotify: spotify?.status() });
 const musicChanged = () => send('focus:music-status', musicSnapshot());
 function playLocal(signal, phase) {
-  if (!recorder.data.music) return;
+  const audio = recorder.data.localAudio?.[phase];
+  if (!audio) return;
   return new Promise((resolve, reject) => {
     const id = randomUUID();
     const abort = () => {
@@ -92,8 +95,9 @@ function playLocal(signal, phase) {
     send('focus:music-command', {
       type: 'play',
       id,
+      src: `focusmedia://music/${audio.id}`,
       volume: recorder.data.settings.volume,
-      seconds: phase === 'intro' ? recorder.data.settings.musicSeconds : 0,
+      seconds: 0,
     });
   });
 }
@@ -325,7 +329,11 @@ function stopCamera() {
 }
 async function startSession() {
   const id = await recorder.start();
-  if (!testMode && !tracker) tracker = startTracker(recorder.data.settings.browserHints);
+  if (!testMode && !tracker)
+    tracker = startTracker(
+      recorder.data.settings.browserHints,
+      recorder.data.settings.browserDomains,
+    );
   lastReminder = Date.now();
   lastNudge = Date.now();
   await recorder.tick();
@@ -475,6 +483,12 @@ else {
         idle: () => (testMode ? 0 : powerMonitor.getSystemIdleTime()),
       });
       await recorder.init();
+      if (!recorder.data.localAudio) {
+        recorder.data.localAudio = recorder.data.music
+          ? { intro: { id: 'legacy', name: 'MP3 importé' } }
+          : {};
+        await recorder.save();
+      }
       spotify = new Spotify({
         dir: dataDir(),
         encryption: safeStorage,
@@ -489,7 +503,7 @@ else {
           musicChanged();
         },
         play: async (slot, signal, phase) => {
-          if (slot.source === 'local' && !recorder.data.music) return;
+          if (slot.source === 'local' && !recorder.data.localAudio?.[phase]) return;
           musicStatus = { playing: true, phase, error: '' };
           musicChanged();
           try {
@@ -516,8 +530,11 @@ else {
             if (!recorder.data.sessions.some((s) => s.frames.some((f) => f.id === id && f.camera)))
               return new Response('Photo expirée', { status: 404 });
             file = recorder.cameraPath(id);
-          } else if (url.hostname === 'music' && recorder.data.music && url.pathname === '/track')
-            file = path.join(dataDir(), 'music.mp3');
+          } else if (
+            url.hostname === 'music' &&
+            Object.values(recorder.data.localAudio).some((a) => a.id === url.pathname.slice(1))
+          )
+            file = audioPath(dataDir(), url.pathname.slice(1));
           else return new Response('Introuvable', { status: 404 });
           return await net.fetch(pathToFileURL(file).toString(), { headers: request.headers });
         } catch {
@@ -545,7 +562,10 @@ else {
           !testMode &&
           !tracker
         )
-          tracker = startTracker(recorder.data.settings.browserHints);
+          tracker = startTracker(
+            recorder.data.settings.browserHints,
+            recorder.data.settings.browserDomains,
+          );
         send('focus:change', state);
         updateTray();
         updateWidget();
@@ -587,6 +607,14 @@ else {
           .filter((d) => !d.is_restricted)
           .map((d) => ({ id: d.id, name: d.name, type: d.type })),
       );
+      bind('spotifySearch', (q, offset) => spotify.search(q, offset));
+      bind('spotifyPlaylists', (offset) => spotify.playlists(offset));
+      bind('spotifyResolve', (value, kind) => spotify.resolve(value, kind));
+      bind('spotifyOpen', (value) => {
+        const kind = String(value).startsWith('spotify:playlist:') ? 'playlist' : 'track';
+        const uri = spotifyUri(value, kind);
+        return shell.openExternal('https://open.spotify.com/' + kind + '/' + uri.split(':')[2]);
+      });
       bind('spotifySetup', () => shell.openExternal('https://developer.spotify.com/dashboard'));
       bind('screens', () =>
         screen.getAllDisplays().map((d, i) => ({
@@ -609,6 +637,7 @@ else {
       });
       bind('settings', async (settings) => {
         const hints = recorder.data.settings.browserHints;
+        const domains = recorder.data.settings.browserDomains;
         if (settings.cameraEnabled === false) {
           cameraConsent = false;
           stopCamera();
@@ -618,11 +647,18 @@ else {
         await recorder.settings(settings);
         if (settings.musicSlots || (localMusic && settings.musicEnabled === false))
           musicDirector.stop();
-        if (!testMode && hints !== recorder.data.settings.browserHints) {
+        if (
+          !testMode &&
+          (hints !== recorder.data.settings.browserHints ||
+            domains !== recorder.data.settings.browserDomains)
+        ) {
           tracker?.stop();
           tracker =
             recorder.active?.status === 'recording' && !recorder.systemPaused
-              ? startTracker(recorder.data.settings.browserHints)
+              ? startTracker(
+                  recorder.data.settings.browserHints,
+                  recorder.data.settings.browserDomains,
+                )
               : null;
         }
         nativeTheme.themeSource = recorder.data.settings.theme;
@@ -667,35 +703,24 @@ else {
         return recorder.redeemReward(id);
       });
       bind('finishBreak', () => recorder.finishBreak());
-      bind('pickMusic', async () => {
+      bind('pickMusic', async (phase = 'intro') => {
+        if (!phases.includes(phase)) throw new Error('Ambiance invalide.');
         const selected =
           testMode && process.env.FOCUS_TEST_MUSIC
             ? { filePaths: [process.env.FOCUS_TEST_MUSIC] }
             : await dialog.showOpenDialog(main, {
-                title: 'Choisir la musique de démarrage',
+                title: 'Choisir un MP3',
                 properties: ['openFile'],
                 filters: [{ name: 'Musique MP3', extensions: ['mp3'] }],
               });
         if (!selected.filePaths?.length) return;
-        const file = selected.filePaths[0];
-        const stat = await fs.stat(file);
-        if (stat.size > 100 * 1024 * 1024) throw new Error('Choisissez un MP3 de moins de 100 Mo.');
-        await recorder.run(async () => {
-          await fs.copyFile(file, path.join(dataDir(), 'music.mp3'));
-          recorder.data.music = true;
-          await recorder.save();
-          recorder.changed();
-        });
+        if (localMusic && musicStatus.phase === phase) await musicDirector.stop();
+        return importAudio(recorder, phase, selected.filePaths[0]);
       });
-      bind('removeMusic', () =>
-        recorder.run(async () => {
-          if (localMusic) await musicDirector.stop();
-          recorder.data.music = false;
-          await fs.rm(path.join(dataDir(), 'music.mp3'), { force: true });
-          await recorder.save();
-          recorder.changed();
-        }),
-      );
+      bind('removeMusic', async (phase = 'intro') => {
+        if (localMusic && musicStatus.phase === phase) await musicDirector.stop();
+        return removeAudio(recorder, phase);
+      });
       bind('deleteSession', (id) => recorder.deleteSession(id));
       bind('deleteFrame', (id) => recorder.deleteFrame(id));
       bind('export', beginExport);

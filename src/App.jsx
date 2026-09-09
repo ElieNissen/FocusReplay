@@ -71,19 +71,17 @@ export default function App() {
     [follow, setFollow] = useState(false),
     [playing, setPlaying] = useState(false),
     [speed, setSpeed] = useState(2),
-    [timelineZoom, setTimelineZoom] = useState(1),
-    [imageZoom, setImageZoom] = useState(1);
+    [timelineZoom, setTimelineZoom] = useState(1);
   const [clock, setClock] = useState(Date.now()),
     [exportState, setExportState] = useState(null),
     [confirmDelete, setConfirmDelete] = useState(null),
     [loadedImage, setLoadedImage] = useState(''),
     [brokenImage, setBrokenImage] = useState('');
 
-  const stage = useRef(null),
-    latest = useRef({});
+  const latest = useRef({});
   const widget = location.hash === '#widget';
   const cameraStatus = useCamera(data, widget);
-  const { audio, musicStatus, musicPlaying, stopMusic, playMusic, musicEnded } = useMusic(
+  const { audio, musicStatus, musicPlaying, stopMusic, musicEnded } = useMusic(
     Boolean(data),
     widget,
   );
@@ -548,9 +546,6 @@ export default function App() {
             busy={busy}
             act={act}
             onBack={() => setView('replay')}
-            playMusic={playMusic}
-            stopMusic={stopMusic}
-            musicPlaying={musicPlaying}
             musicStatus={musicStatus}
           />
         ) : (
@@ -630,38 +625,9 @@ export default function App() {
               </section>
             ) : (
               <>
-                <section
-                  className="replay-stage"
-                  ref={stage}
-                  aria-label="Prévisualisation de la capture"
-                >
-                  <div className="stage-top">
-                    <span className={`category-pill ${current?.category || 'unknown'}`}>
-                      <span />
-                      {labels[current?.category] || labels.unknown}
-                    </span>
-                    <div>
-                      <IconButton
-                        icon={imageZoom === 1 ? ZoomIn : RotateCcw}
-                        label={imageZoom === 1 ? 'Agrandir la capture' : 'Ajuster la capture'}
-                        onClick={() => setImageZoom((z) => (z === 1 ? 2 : 1))}
-                      />
-                      <IconButton
-                        icon={Maximize}
-                        label="Plein écran"
-                        onClick={() =>
-                          document.fullscreenElement
-                            ? document.exitFullscreen()
-                            : stage.current.requestFullscreen()
-                        }
-                      />
-                    </div>
-                  </div>
+                <section className="replay-stage" aria-label="Prévisualisation de la capture">
                   <div className="image-scroll">
-                    <div
-                      className="image-surface"
-                      style={{ width: `${imageZoom * 100}%`, height: `${imageZoom * 100}%` }}
-                    >
+                    <div className="image-surface" style={{ width: '100%', height: '100%' }}>
                       <img
                         src={imageUrl(current)}
                         alt={`Capture du ${new Date(current.at).toLocaleDateString('fr-FR')} à ${time(current.at)}, ${current.app}`}
@@ -691,15 +657,9 @@ export default function App() {
                       </>
                     )}
                   </div>
-                  <div className="stage-caption">
-                    <span>
-                      <Monitor size={14} />
-                      {current.app}
-                    </span>
-                  </div>
                 </section>
                 <div className="transport">
-                  <div className="timestamp">
+                  <div className="timestamp" title={current.app}>
                     <strong>{time(current.at)}</strong>
                     <span>
                       {index + 1} / {frames.length}
@@ -729,19 +689,19 @@ export default function App() {
                       disabled={index === frames.length - 1}
                       onClick={() => step(1)}
                     />
-                    <label className="inline-slider" title="Vitesse de lecture">
-                      <input
-                        aria-label="Vitesse de lecture"
-                        type="range"
-                        min="1"
-                        max="8"
-                        step="1"
-                        value={speed}
-                        onChange={(e) => setSpeed(Number(e.target.value))}
-                      />
-                      <output>{speed} img/s</output>
-                    </label>
                   </div>
+                  <label className="inline-slider" title="Vitesse de lecture">
+                    <input
+                      aria-label="Vitesse de lecture"
+                      type="range"
+                      min="1"
+                      max="8"
+                      step="1"
+                      value={speed}
+                      onChange={(e) => setSpeed(Number(e.target.value))}
+                    />
+                    <output>{speed} img/s</output>
+                  </label>
                 </div>
                 <Timeline
                   frames={frames}
@@ -752,6 +712,15 @@ export default function App() {
                   zoom={timelineZoom}
                   setZoom={setTimelineZoom}
                   seek={seek}
+                  settings={settings}
+                  onRule={(key, value, category) =>
+                    act(() => {
+                      const rules = { ...settings[key] };
+                      if (category === 'auto') delete rules[value];
+                      else rules[value] = category;
+                      return api.settings({ [key]: rules });
+                    })
+                  }
                 />
               </>
             )}
@@ -852,8 +821,8 @@ export default function App() {
       {data.music && (
         <audio
           ref={audio}
-          src="focusmedia://music/track"
-          preload="auto"
+
+          preload="none"
           onEnded={musicEnded}
           onError={() => musicEnded(true)}
         />

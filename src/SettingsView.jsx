@@ -15,17 +15,7 @@ import {
 import { Toggle } from './Toggle';
 import MusicSettings from './MusicSettings';
 const api = window.focusReplay;
-export default function SettingsView({
-  settings,
-  data,
-  busy,
-  act,
-  onBack,
-  playMusic,
-  stopMusic,
-  musicPlaying,
-  musicStatus,
-}) {
+export default function SettingsView({ settings, data, busy, act, onBack, musicStatus }) {
   const [screens, setScreens] = useState([]),
     [cameraConsentOpen, setCameraConsentOpen] = useState(false);
   useEffect(() => {
@@ -134,12 +124,11 @@ export default function SettingsView({
       </section>
       <section className="settings-section">
         <h2>
-          <Camera size={19} /> Caméra, si vous le souhaitez
+          <Camera size={19} /> Caméra
         </h2>
         <label className="setting-row">
           <span>
             <strong>Ajouter une photo caméra aux captures</strong>
-            <small>Désactivé par défaut. Photos locales uniquement, sans microphone.</small>
           </span>
           <input
             aria-label="Ajouter une photo caméra aux captures"
@@ -157,10 +146,8 @@ export default function SettingsView({
           <div className="camera-consent">
             <strong>Autoriser les photos de votre caméra ?</strong>
             <p>
-              Pendant vos prochaines sessions, la caméra restera ouverte pour prendre une photo en
-              même temps que chaque capture d’écran. Son voyant peut rester allumé. Elle s’arrête en
-              pause et en fin de session. Les photos restent sur ce PC, suivent la même suppression
-              automatique et peuvent être incluses dans vos exports.
+              La caméra prendra une photo à chaque capture d’écran. Elle reste ouverte pendant la
+              session, s’arrête en pause et peut apparaître dans les exports.
             </p>
             <div>
               <button onClick={() => setCameraConsentOpen(false)}>Pas maintenant</button>
@@ -179,69 +166,12 @@ export default function SettingsView({
           </div>
         )}
       </section>
-      <MusicSettings settings={settings} act={act} busy={busy} status={musicStatus} />
+      <MusicSettings data={data} settings={settings} act={act} busy={busy} status={musicStatus} />
       <section className="settings-section">
         <h2>
-          <Music2 size={19} /> MP3 local
+          <Eye size={19} /> Suivi
         </h2>
-        <div className="setting-row">
-          <span>
-            <strong>{data.music ? 'Musique de démarrage prête' : 'Ajouter votre musique'}</strong>
-            <small>
-              Un MP3 local, copié dans l’espace privé de l’application. Aucun compte nécessaire.
-            </small>
-          </span>
-          <button disabled={busy} onClick={() => act(() => api.pickMusic())}>
-            <Music2 size={16} />
-            {data.music ? 'Changer le MP3' : 'Choisir un MP3'}
-          </button>
-        </div>
-        {data.music && (
-          <div className="music-actions">
-            <button onClick={musicPlaying ? stopMusic : playMusic}>
-              {musicPlaying ? <Pause size={16} /> : <Play size={16} />}{' '}
-              {musicPlaying ? 'Arrêter l’écoute' : 'Écouter un extrait'}
-            </button>
-            <button
-              className="text-button"
-              onClick={() =>
-                act(async () => {
-                  stopMusic();
-                  await api.removeMusic();
-                })
-              }
-            >
-              <Trash2 size={15} /> Retirer
-            </button>
-          </div>
-        )}
-        {select('musicSeconds', 'Durée du MP3 de début', [
-          [15, '15 secondes'],
-          [30, '30 secondes'],
-          [60, '1 minute'],
-          [0, 'Morceau entier'],
-        ])}
-        <label className="setting-row">
-          <span>
-            <strong>Volume</strong>
-            <small>{Math.round(settings.volume * 100)} %</small>
-          </span>
-          <input
-            aria-label="Volume de la musique"
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            defaultValue={settings.volume}
-            onPointerUp={(e) => save('volume', Number(e.target.value))}
-            onKeyUp={(e) => save('volume', Number(e.target.value))}
-          />
-        </label>
-      </section>
-      <section className="settings-section">
-        <h2>
-          <Eye size={19} /> Un regard discret
-        </h2>
+        {toggle('browserDomains', 'Reconnaître les sites (domaine uniquement)')}
         {toggle(
           'browserHints',
           'Reconnaître les usages du navigateur',
@@ -300,22 +230,10 @@ export default function SettingsView({
           ['system', 'Suivre Windows'],
         ])}
       </section>
-      <section className="settings-section">
-        <h2>
-          <ShieldCheck size={19} /> Vos données restent ici
-        </h2>
-        <p>
-          Les captures et l’activité restent locales. Spotify, si connecté, reçoit uniquement les
-          commandes de musique. Les captures peuvent contenir ce qui était visible à l’écran. Elles
-          restent hors du dépôt du logiciel.
-        </p>
-        <div className="privacy-stats">
-          <span>{(data.bytes / 1024 / 1024).toFixed(1)} Mo de captures</span>
-          <button onClick={() => api.openData()}>
-            <FolderOpen size={16} /> Ouvrir le dossier local
-          </button>
-        </div>
-      </section>
+      <button onClick={() => api.openData()}>
+        <FolderOpen size={16} />
+        Ouvrir les fichiers
+      </button>
     </div>
   );
 }

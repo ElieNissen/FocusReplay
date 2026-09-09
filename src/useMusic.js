@@ -23,6 +23,7 @@ export function useMusic(ready, widget) {
       musicEnded();
       current.current = command.id;
       if (!audio.current) return musicEnded(true);
+      audio.current.src = command.src;
       audio.current.volume = command.volume;
       audio.current.currentTime = 0;
       audio.current.loop = false;

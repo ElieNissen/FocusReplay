@@ -1,6 +1,7 @@
 const { spawn } = require('node:child_process');
 const path = require('node:path');
 const readline = require('node:readline');
+const { domainOnly } = require('./sites.cjs');
 const NAMES = {
   chrome: 'Google Chrome',
   msedge: 'Microsoft Edge',
@@ -32,7 +33,7 @@ function classify(name, hint = 'unknown') {
     return 'distraction';
   return 'unknown';
 }
-function startTracker(browserHints = true) {
+function startTracker(browserHints = true, browserDomains = false) {
   let name = null,
     last = 0,
     child;
@@ -53,15 +54,23 @@ function startTracker(browserHints = true) {
       {
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'ignore'],
-        env: { ...process.env, FOCUS_BROWSER_HINTS: browserHints ? '1' : '0' },
+        env: {
+          ...process.env,
+          FOCUS_BROWSER_HINTS: browserHints ? '1' : '0',
+          FOCUS_BROWSER_DOMAINS: browserDomains ? '1' : '0',
+        },
       },
     );
     readline.createInterface({ input: child.stdout }).on('line', (line) => {
       try {
-        const { name: n, hint } = JSON.parse(line);
+        const { name: n, hint, domain } = JSON.parse(line);
         name =
           typeof n === 'string'
-            ? { app: (NAMES[n] || n).slice(0, 100), category: classify(n, hint) }
+            ? {
+                app: (NAMES[n] || n).slice(0, 100),
+                category: classify(n, hint),
+                domain: browserDomains ? domainOnly(domain) : '',
+              }
             : null;
         last = Date.now();
       } catch {}

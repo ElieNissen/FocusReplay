@@ -1469,3 +1469,197 @@ strong {
 .app-stat {
   grid-template-columns: minmax(95px, 1fr) 64px 58px 36px;
 }
+/* Fill the editing surface; keep transport independent of side control widths. */
+.main-content {
+  padding: 0 16px 16px;
+}
+.session-bar {
+  min-height: 48px;
+}
+.page-heading {
+  padding: 8px 0;
+  margin: 4px 0 8px;
+}
+.replay-stage {
+  height: max(260px, calc(100dvh - 345px));
+  min-height: 260px;
+  border: 0;
+  border-radius: 4px;
+}
+.image-scroll {
+  margin: 0;
+  overflow: hidden;
+}
+.image-surface img {
+  border-radius: 0;
+}
+.camera-pip {
+  bottom: 10px;
+  right: 10px;
+}
+.transport {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  padding: 8px 0;
+  gap: 8px;
+}
+.transport .playback {
+  justify-self: center;
+}
+.transport > .inline-slider {
+  justify-self: end;
+}
+.timestamp {
+  gap: 8px;
+}
+.timestamp span {
+  white-space: nowrap;
+}
+.filmstrip,
+.filmstrip img {
+  height: 94px;
+}
+.scrubber {
+  height: 133px;
+}
+.timeline-rule {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.timeline-rule label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+}
+.timeline-rule > button {
+  margin-left: auto;
+}
+.music-slot-options {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.choice-buttons {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.choice-buttons button {
+  border-color: transparent;
+  background: transparent;
+}
+.choice-buttons button[aria-pressed='true'] {
+  background: var(--selected);
+  border-color: var(--selected-border);
+  color: var(--accent);
+}
+.local-track {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+.local-track > span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.music-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding-left: 10px;
+}
+.music-search input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+}
+.music-picker {
+  display: grid;
+  gap: 10px;
+}
+.music-picker summary {
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.search-results {
+  max-height: 300px;
+  overflow: auto;
+}
+.track-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 4px;
+}
+.track-row:hover {
+  background: var(--hover);
+}
+.track-row img,
+.track-art {
+  width: 40px;
+  height: 40px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.track-art {
+  display: grid;
+  place-items: center;
+  background: var(--hover);
+}
+.track-name {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+.track-name strong,
+.track-name small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.track-name small {
+  color: var(--muted);
+}
+.picker-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.selected-tracks:empty {
+  display: none;
+}
+.settings-page {
+  max-width: 900px;
+}
+@media (max-width: 1000px) {
+  .main-content {
+    padding: 0 12px 12px;
+  }
+  .replay-stage {
+    height: max(250px, calc(100dvh - 330px));
+  }
+  .transport .inline-slider input {
+    width: 65px;
+  }
+  .timestamp {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+  }
+}
+.replay-stage {
+  height: max(240px, calc(100dvh - 180px - var(--timeline-height, 234px)));
+}

@@ -3,6 +3,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { EventEmitter } = require('node:events');
 const { classify } = require('./tracker.cjs');
+const { domainOnly, siteCategory } = require('./sites.cjs');
 const { defaults: musicSlots, validateMusic } = require('./music-config.cjs');
 
 const DEFAULTS = Object.freeze({
@@ -27,6 +28,8 @@ const DEFAULTS = Object.freeze({
   pointsPerHour: 60,
   earnMode: 'work',
   appRules: {},
+  siteRules: {},
+  browserDomains: false,
 });
 const DEFAULT_REWARDS = [
   { id: 'stretch', name: 'Se lever et souffler', minutes: 5, cost: 25 },
@@ -82,7 +85,7 @@ function validateSettings(input, previous = DEFAULTS) {
       if (typeof value !== 'string' || value.length > 200)
         throw new Error('Appareil Spotify invalide.');
       s.spotifyDevice = value;
-    } else if (key === 'appRules') {
+    } else if (key === 'appRules' || key === 'siteRules') {
       if (
         !value ||
         Array.isArray(value) ||
@@ -90,7 +93,7 @@ function validateSettings(input, previous = DEFAULTS) {
         Object.keys(value).length > 200
       )
         throw new Error('Règles invalides');
-      s.appRules = Object.fromEntries(
+      s[key] = Object.fromEntries(
         Object.entries(value).map(([app, category]) => {
           if (
             !app.trim() ||
@@ -98,7 +101,9 @@ function validateSettings(input, previous = DEFAULTS) {
             !['work', 'distraction', 'unknown'].includes(category)
           )
             throw new Error('Règle invalide');
-          return [app.toLowerCase(), category];
+          const name = key === 'siteRules' ? domainOnly(app) : app.toLowerCase();
+          if (!name || (key === 'siteRules' && name !== app)) throw new Error('Domaine invalide.');
+          return [name, category];
         }),
       );
     } else if (key in bounds) {
@@ -115,6 +120,7 @@ function validateSettings(input, previous = DEFAULTS) {
         'musicEnabled',
         'widget',
         'browserHints',
+        'browserDomains',
         'distractionReminder',
         'cameraEnabled',
         'rewardsEnabled',
@@ -342,17 +348,21 @@ class Recorder extends EventEmitter {
       this.changed();
     });
   }
-  categoryFor(app, detected = 'unknown') {
+  categoryFor(app, detected = 'unknown', domain = '') {
     if (detected === 'idle') return 'idle';
+    if (domain && Object.hasOwn(this.data.settings.siteRules || {}, domain))
+      return this.data.settings.siteRules[domain];
     const key = String(app || '').toLowerCase();
     const rules = this.data.settings.appRules || {};
-    return Object.hasOwn(rules, key) ? rules[key] : classify(app, detected);
+    return Object.hasOwn(rules, key)
+      ? rules[key]
+      : (siteCategory(domain) ?? classify(app, detected));
   }
   applyRules() {
     for (const session of this.data.sessions)
       for (const item of [...session.activity, ...session.frames]) {
         item.detectedCategory ??= item.category || 'unknown';
-        item.category = this.categoryFor(item.app, item.detectedCategory);
+        item.category = this.categoryFor(item.app, item.detectedCategory, item.domain);
       }
   }
   async settings(input) {
@@ -398,7 +408,9 @@ class Recorder extends EventEmitter {
       this.trackingAvailable = Boolean(app);
       const detectedCategory =
         typeof activity === 'object' && activity ? activity.category || 'unknown' : 'unknown';
-      const category = this.categoryFor(app, detectedCategory);
+      const domain =
+        this.data.settings.browserDomains && this.idle() < 300 ? domainOnly(activity?.domain) : '';
+      const category = this.categoryFor(app, detectedCategory, domain);
       if (s && s.status === 'recording' && !this.systemPaused) {
         const name = this.idle() >= 300 ? 'Inactivité (5 min+)' : app;
         if (name && elapsed) {
@@ -407,6 +419,7 @@ class Recorder extends EventEmitter {
           if (
             last &&
             last.app === name &&
+            (last.domain || '') === domain &&
             last.category === cat &&
             last.detectedCategory === (this.idle() >= 300 ? 'idle' : detectedCategory) &&
             at - last.to < 6000 &&
@@ -417,6 +430,7 @@ class Recorder extends EventEmitter {
           } else
             s.activity.push({
               app: String(name).slice(0, 100),
+              domain,
               category: cat,
               detectedCategory: this.idle() >= 300 ? 'idle' : detectedCategory,
               from: at - elapsed,
@@ -472,6 +486,7 @@ class Recorder extends EventEmitter {
               at: capturedAt || this.now(),
               interval: this.data.settings.interval,
               app: name || 'Logiciel non identifié',
+              domain,
               category: this.idle() >= 300 ? 'idle' : category,
               detectedCategory: this.idle() >= 300 ? 'idle' : detectedCategory,
               display,

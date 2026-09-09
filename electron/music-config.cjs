@@ -7,6 +7,7 @@ const defaults = Object.fromEntries(
       source: 'local',
       mode: 'track',
       links: '',
+      items: [],
     },
   ]),
 );
@@ -70,7 +71,29 @@ function validateMusic(value) {
         source: slot.source,
         mode: slot.mode,
         links: slot.links.trim(),
+        items: [],
       };
+      if (slot.items !== undefined) {
+        if (!Array.isArray(slot.items) || slot.items.length > 100)
+          throw new Error('Sélection invalide.');
+        result.items = slot.items.map((item) => {
+          if (
+            !item ||
+            typeof item.name !== 'string' ||
+            item.name.length > 300 ||
+            typeof item.subtitle !== 'string' ||
+            item.subtitle.length > 500
+          )
+            throw new Error('Titre invalide.');
+          const uri = spotifyUri(item.uri, slot.mode === 'playlist' ? 'playlist' : 'track');
+          const image =
+            typeof item.image === 'string' &&
+            /^https:\/\/i\.scdn\.co\/image\/[a-zA-Z0-9]+$/.test(item.image)
+              ? item.image
+              : '';
+          return { uri, name: item.name, subtitle: item.subtitle, image };
+        });
+      }
       if (result.source === 'spotify' && result.links) selection(result);
       return [phase, result];
     }),

@@ -3,8 +3,27 @@ import { ZoomIn, ZoomOut } from 'lucide-react';
 import { shortTime, duration, frameAt } from './lib.mjs';
 import { placeLabels } from './timeline-layout.mjs';
 
-export default function Timeline({ frames, segments, start, end, cursor, zoom, setZoom, seek }) {
+export default function Timeline({
+  frames,
+  segments,
+  start,
+  end,
+  cursor,
+  zoom,
+  setZoom,
+  seek,
+  settings,
+  onRule,
+}) {
   const scroll = useRef(null);
+  const [editing, setEditing] = useState(null);
+  useEffect(() => {
+    const close = (e) => {
+      if (e.key === 'Escape') setEditing(null);
+    };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, []);
   const [viewport, setViewport] = useState(900);
   const [offset, setOffset] = useState(0);
   const span = Math.max(1, end - start);
@@ -37,10 +56,16 @@ export default function Timeline({ frames, segments, start, end, cursor, zoom, s
     .filter((a) => a.to >= start && a.from <= end)
     .map((a) => ({
       ...a,
+      label: a.domain || a.app,
       x: Math.max(0, ((a.from - start) / span) * width),
       width: Math.max(2, ((Math.min(end, a.to) - Math.max(start, a.from)) / span) * width),
     }));
   const layout = placeLabels(visible, width, offset, viewport);
+  useEffect(() => {
+    const main = scroll.current?.closest('main');
+    main?.style.setProperty('--timeline-height', `${234 + layout.rows * 30}px`);
+    return () => main?.style.removeProperty('--timeline-height');
+  }, [layout.rows]);
   // A compact strip grows with the recording. Each tile represents its true timestamp.
   const tiles = useMemo(() => {
     const count = Math.max(1, Math.ceil(width / 96));
@@ -53,6 +78,32 @@ export default function Timeline({ frames, segments, start, end, cursor, zoom, s
   const ticks = Math.max(2, Math.min(9, Math.floor(width / 130) + 1));
   return (
     <section className="timeline-section" aria-label="Timeline interactive">
+      {editing && (
+        <div className="timeline-rule" role="region" aria-label="Classement depuis la timeline">
+          <strong>{editing.domain || editing.app}</strong>
+          {[
+            ['appRules', editing.app.toLowerCase(), editing.app],
+            ...(editing.domain ? [['siteRules', editing.domain, editing.domain]] : []),
+          ].map(([key, value, label]) => (
+            <label key={key}>
+              {label}
+              <select
+                aria-label={'Classement · ' + label}
+                value={settings[key]?.[value] || 'auto'}
+                onChange={(e) => onRule(key, value, e.target.value)}
+              >
+                <option value="auto">Automatique</option>
+                <option value="work">Travail</option>
+                <option value="distraction">Loisir</option>
+                <option value="unknown">Indéterminé</option>
+              </select>
+            </label>
+          ))}
+          <button onClick={() => setEditing(null)} aria-label="Fermer le classement">
+            ×
+          </button>
+        </div>
+      )}
       <div className="timeline-toolbar">
         <div className="inline-slider zoom-control">
           <button
@@ -81,7 +132,7 @@ export default function Timeline({ frames, segments, start, end, cursor, zoom, s
         onScroll={(e) => setOffset(e.currentTarget.scrollLeft)}
         title="Molette : zoom · Maj + molette : défilement"
       >
-        <div className="timeline-inner" style={{ width, height: 146 + layout.rows * 30 }}>
+        <div className="timeline-inner" style={{ width, height: 174 + layout.rows * 30 }}>
           <div className="ruler">
             {Array.from({ length: ticks }, (_, i) => (
               <span key={i}>{shortTime(start + (span * i) / (ticks - 1))}</span>
@@ -121,11 +172,14 @@ export default function Timeline({ frames, segments, start, end, cursor, zoom, s
                 <button
                   className={`software-segment ${a.category || 'unknown'}`}
                   style={{ left: a.x, width: a.width }}
-                  aria-label={`${a.app} · ${duration(a.ms)}`}
+                  aria-label={`${a.domain || a.app} · ${duration(a.ms)}`}
                   title={`${a.app} · ${shortTime(a.from)}–${shortTime(a.to)} · ${duration(a.ms)}`}
-                  onClick={() => seek(Math.max(start, a.from))}
+                  onClick={() => {
+                    seek(Math.max(start, a.from));
+                    setEditing(a);
+                  }}
                 >
-                  {!a.callout && <span>{a.app}</span>}
+                  {!a.callout && <span>{a.label}</span>}
                 </button>
                 {a.callout && (
                   <>
@@ -137,10 +191,13 @@ export default function Timeline({ frames, segments, start, end, cursor, zoom, s
                       className="software-callout"
                       style={{ left: a.labelX, top: 35 + a.row * 30, width: a.labelWidth }}
                       title={`${a.app} · ${duration(a.ms)}`}
-                      onClick={() => seek(Math.max(start, a.from))}
+                      onClick={() => {
+                        seek(Math.max(start, a.from));
+                        setEditing(a);
+                      }}
                     >
                       <i className={a.category || 'unknown'} />
-                      {a.app}
+                      {a.label}
                       <small>{duration(a.ms)}</small>
                     </button>
                   </>

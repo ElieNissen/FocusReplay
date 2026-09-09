@@ -11,11 +11,45 @@ public static class ForegroundApp {
   public static int Id() { uint value; GetWindowThreadProcessId(GetForegroundWindow(), out value); return (int)value; }
 }
 '@
+if ($env:FOCUS_BROWSER_DOMAINS -eq '1') {
+  Add-Type -AssemblyName UIAutomationClient
+  Add-Type -AssemblyName UIAutomationTypes
+}
+function Get-BrowserDomain {
+  try {
+    $handle = [ForegroundApp]::GetForegroundWindow()
+    $root = [System.Windows.Automation.AutomationElement]::FromHandle($handle)
+    $condition = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
+    $edits = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condition)
+    foreach ($edit in $edits) {
+      $info = $edit.Current
+      if ($info.AutomationId -notmatch '^(urlbar-input|addressEditBox)$' -and $info.Name -notmatch '^(Address and search bar|Address and Search Bar|Barre d.adresse et de recherche|Barre d.adresse|Search or enter address|Rechercher ou saisir une adresse)$') { continue }
+      $parent = $edit
+      $toolbar = $false
+      for ($depth = 0; $depth -lt 12; $depth++) {
+        $parent = [System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($parent)
+        if (!$parent -or $parent.Current.ControlType -eq [System.Windows.Automation.ControlType]::Document) { break }
+        if ($parent.Current.ControlType -eq [System.Windows.Automation.ControlType]::ToolBar) { $toolbar = $true; break }
+      }
+      if (!$toolbar -or $info.IsPassword) { continue }
+      $pattern = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
+      $value = $pattern.Current.Value
+      if ($value -notmatch '^https?://') { $value = 'https://' + $value }
+      $uri = $null
+      if ([Uri]::TryCreate($value, [UriKind]::Absolute, [ref]$uri) -and $uri.Scheme -match '^https?$' -and !$uri.UserInfo -and [ForegroundApp]::GetForegroundWindow() -eq $handle) {
+        return $uri.DnsSafeHost.ToLowerInvariant()
+      }
+    }
+  } catch {}
+  return ''
+}
 while ($true) {
   try {
     $foregroundId = [ForegroundApp]::Id()
     $foregroundName = (Get-Process -Id $foregroundId -ErrorAction Stop).ProcessName
     $hint = 'unknown'
+    $domain = ''
+    if ($env:FOCUS_BROWSER_DOMAINS -eq '1' -and $foregroundName -match '^(chrome|msedge|firefox|brave|opera)$') { $domain = Get-BrowserDomain }
     if ($env:FOCUS_BROWSER_HINTS -eq '1' -and $foregroundName -match '^(chrome|msedge|firefox|brave|opera)$') {
       $windowText = [ForegroundApp]::Title()
       if ($windowText -match '(?i)(Netflix|Twitch|TikTok|Instagram|Facebook|Reddit)') { $hint = 'distraction' }
@@ -23,7 +57,8 @@ while ($true) {
       # YouTube, search and unrecognized titles stay ambiguous. Never output or persist titles.
       $windowText = $null
     }
-    @{ name = $foregroundName; hint = $hint } | ConvertTo-Json -Compress
+    if ([ForegroundApp]::Id() -ne $foregroundId) { throw 'Foreground changed' }
+    @{ name = $foregroundName; hint = $hint; domain = $domain } | ConvertTo-Json -Compress
   } catch { '{"name":null}' }
   Start-Sleep -Seconds 2
 }

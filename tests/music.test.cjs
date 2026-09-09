@@ -193,3 +193,63 @@ test('expired credentials refresh once for concurrent requests; rate limits do n
   assert.equal(s.auth.refresh_token, 'test-refresh');
   await assert.rejects(s.request('/me/player'), /quelques minutes/);
 });
+test('each phase imports and replaces an independent MP3', async (t) => {
+  const { Recorder } = require('../electron/core.cjs');
+  const { importAudio, removeAudio, audioPath } = require('../electron/local-music.cjs');
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'focus-audio-'));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const r = new Recorder({ dir, capture: async () => ({}) });
+  await r.init();
+  const source = path.join(dir, 'source.mp3');
+  await fs.writeFile(source, 'first');
+  await importAudio(r, 'intro', source);
+  const intro = r.data.localAudio.intro.id;
+  await fs.writeFile(source, 'second');
+  await importAudio(r, 'session', source);
+  assert.equal(await fs.readFile(audioPath(dir, intro), 'utf8'), 'first');
+  assert.equal(await fs.readFile(audioPath(dir, r.data.localAudio.session.id), 'utf8'), 'second');
+  await removeAudio(r, 'session');
+  assert.ok(r.data.localAudio.intro);
+  await assert.rejects(importAudio(r, '../escape', source));
+});
+test('Spotify catalog uses bounded search and paged personal playlists', async () => {
+  const calls = [];
+  const s = client(async (url) => {
+    calls.push(url);
+    if (url.includes('/search?'))
+      return reply({
+        tracks: {
+          items: [
+            {
+              uri: track,
+              name: 'Test',
+              artists: [{ name: 'Artist' }],
+              album: { images: [{ url: 'https://evil.test/image' }] },
+            },
+          ],
+          next: 'more',
+        },
+      });
+    return reply({
+      items: [
+        null,
+        {
+          uri: 'spotify:playlist:' + 'b'.repeat(22),
+          name: 'Mine',
+          owner: { display_name: 'Test owner' },
+        },
+      ],
+      next: null,
+    });
+  });
+  s.auth.scope = 'playlist-read-private';
+  const found = await s.search('hello & goodbye');
+  assert.equal(found.items[0].name, 'Test');
+  assert.equal(found.items[0].image, '');
+  assert.ok(calls[0].includes('limit=10'));
+  assert.equal((await s.playlists(50)).items.length, 1);
+  assert.ok(calls[1].endsWith('offset=50'));
+  await assert.rejects(s.search('hello', -1));
+  s.auth.scope = '';
+  await assert.rejects(s.playlists(), /Reconnectez/);
+});

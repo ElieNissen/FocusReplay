@@ -376,3 +376,33 @@ test('video names and graphic overlay preserve actual software transitions', () 
   assert.match(overlay, /Browser/);
   assert.match(overlay, /0:00:00.25/);
 });
+test('site rules override app and automatic hints without storing page URLs', async (t) => {
+  const { domainOnly } = require('../electron/sites.cjs');
+  const f = await fixture(t);
+  let domain = 'https://www.youtube.com/watch?v=private-value';
+  f.r.activity = () => ({ app: 'Google Chrome', category: 'unknown', domain });
+  await f.r.settings({
+    browserDomains: true,
+    appRules: { 'google chrome': 'distraction' },
+    siteRules: { 'youtube.com': 'work' },
+  });
+  await f.r.start();
+  f.advance(2000);
+  await f.r.tick();
+  assert.equal(f.r.active.activity[0].domain, 'youtube.com');
+  assert.equal(f.r.active.activity[0].category, 'work');
+  domain = 'https://reddit.com/r/test?private=1';
+  f.advance(2000);
+  await f.r.tick();
+  assert.equal(f.r.active.activity.length, 2);
+  assert.equal(f.r.active.activity[1].category, 'distraction');
+  await f.r.settings({ siteRules: { 'youtube.com': 'unknown' } });
+  assert.equal(f.r.active.activity[0].category, 'unknown');
+  assert.equal(JSON.stringify(f.r.snapshot()).includes('private-value'), false);
+  await f.r.settings({ browserDomains: false });
+  f.advance(2000);
+  await f.r.tick();
+  assert.equal(f.r.active.activity.at(-1).domain, '');
+  assert.equal(domainOnly('file:///private.txt'), '');
+  assert.equal(domainOnly('https://github.com.evil.example/path'), 'github.com.evil.example');
+});

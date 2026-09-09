@@ -70,14 +70,14 @@ See [SECURITY.md](SECURITY.md) for exact data flow, retention and limitations. C
 
 ## Music (Spotify or local MP3)
 
-Three independent switches in **Réglages → Musique**: app launch, session intro and session soundtrack. Each accepts the imported MP3, one Spotify track, up to 100 pasted track links (shuffled without duplicates), or a playlist link. The intro completes before the soundtrack begins. Nothing loops. Starting a session interrupts launch music. Pause, lock, stop and Quit stop app-controlled music; resume does not automatically restart it. Use Écouter to play it again.
+Three independent switches in **Réglages → Musique**: app launch, session intro and session soundtrack. Each has its own independent imported MP3 or accepts one Spotify track, up to 100 pasted track links (shuffled without duplicates), or a playlist link. The intro completes before the soundtrack begins. Nothing loops. Starting a session interrupts launch music. Pause, lock, stop and Quit stop app-controlled music; resume does not automatically restart it. Use Écouter to play it again.
 
 Spotify setup, once per local profile:
 
 1. A Spotify Premium account is required. Open **Connecter Spotify → Ouvrir Spotify Developers** and create a development app using Web API. Current development-mode apps allow up to five authorized accounts.
-2. Register exactly `http://127.0.0.1:43827/callback` as its redirect URI. Copy the **Client ID** (never the Client Secret) into FocusReplay and sign in through Spotify's browser page.
+2. Register exactly `http://127.0.0.1:43827/callback` as its redirect URI. Copy the **Client ID** (never the Client Secret) into FocusReplay under Configuration personnelle and sign in through Spotify’s browser page. Individual Premium subscribers can create this personal development app.
 3. Open Spotify on the PC and play a track once. In FocusReplay, refresh and choose that PC under **Compte et appareil Spotify**. Playback always targets the selected device.
-4. Enable the desired phase, choose Spotify and paste a track/playlist link or one track link per line. Save. **Écouter** tests that phase.
+4. Enable the desired phase, choose Spotify and search by track/artist name. Add results to the selection, or choose from Mes playlists. Save. **Écouter** tests that phase. Existing connections must refresh authorization once to grant playlist access.
 
 The Web API controls Spotify Connect; FocusReplay does not download Spotify music or include it in exported videos. Explicit track selections are stopped at the final track boundary to prevent recommendations; network latency may slightly affect that boundary. Playlists use Spotify's own order with repeat and shuffle disabled. Disable Spotify Autoplay to prevent recommended music after a playlist ends. Manually choosing a different song/device relinquishes control and cancels the pending soundtrack. Spotify errors never interrupt capture.
 
@@ -105,3 +105,15 @@ Architecture: Electron main process owns capture, lifecycle and filesystem acces
 Original FocusReplay code: [MIT](LICENSE). Dependencies and the separate FFmpeg encoder retain their own licenses.
 
 Application classification can be adjusted once per software in **Réglages → Classement des logiciels**. Rules apply to existing observations and future captures; reverting to Automatic restores original detection. Previously earned points are unchanged.
+
+## Domains and timeline rules
+
+Enable **Réglages → Suivi → Reconnaître les sites** to read the foreground browser address bar through Windows UI Automation. Chrome, Edge, Brave, Firefox and Opera are attempted with recognized English/French address-bar identifiers. Availability depends on browser accessibility support and language; unsupported bars produce no domain. Only the normalized domain is stored, never the page path/query, browsing history or page contents. This includes private windows if their address bar is accessible. Turning the option off stops future domain observations; existing records follow normal retention/deletion.
+
+Click a software/site label on the timeline to choose Travail, Loisir, Indéterminé or Automatique. Priority: exact-domain personal rule, application personal rule, known domain heuristic, window-title hint/application heuristic. Rules reclassify existing observations and future captures; previously awarded points do not change. Domain rules are exact: www is normalized away, other subdomains remain separate.
+
+A distributor can set the public clientId in electron/spotify-app.json before building to enable shared Spotify sign-in. The included public Client ID is reserved for the invitation-only FocusReplay test group; personal configuration is the default public setup path. Never put a client secret there. Shared development access still requires allowlisting and is limited by Spotify; personal configuration remains available.
+
+## Distribution and a possible hosted service
+
+Recording, replay, local audio and classification work independently of any account. Spotify remains an optional adapter. Public users can configure their own Premium development app; the shared FocusReplay client is explicitly invitation-only and is not advertised as generally available. A SaaS account/backend would not remove Spotify’s development cap or grant extended-quota eligibility. Any future hosted account should remain separate from provider authorization; refresh credentials must never be shared between users. No hosted accounts, billing or upload service are implemented in this version.

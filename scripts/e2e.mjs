@@ -151,6 +151,23 @@ try {
   await page.locator('.image-surface img').evaluate((img) => img.decode());
   await expect(page.locator('.software-callout').filter({ hasText: 'Terminal' })).toBeVisible();
   await expect(page.locator('.software-callout').filter({ hasText: 'Firefox' })).toBeVisible();
+  await page.locator('.software-callout').filter({ hasText: 'Firefox' }).click();
+  await page
+    .getByRole('combobox', { name: 'Classement · Firefox', exact: true })
+    .selectOption('work');
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.focusReplay.state().then((s) => s.settings.appRules.firefox)),
+    )
+    .toBe('work');
+  await page.getByRole('button', { name: 'Fermer le classement', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Plein écran', exact: true })).toHaveCount(0);
+  const alignment = await page.evaluate(() => {
+    const p = document.querySelector('.play-button').getBoundingClientRect();
+    const t = document.querySelector('.transport').getBoundingClientRect();
+    return Math.abs(p.x + p.width / 2 - t.x - t.width / 2);
+  });
+  expect(alignment).toBeLessThan(2);
   await page.screenshot({ path: path.join(root, 'replay-dark.png'), fullPage: true });
   await page.getByRole('slider', { name: 'Curseur de la timeline' }).fill(String(frames[5].at));
   await expect(page.locator('.timestamp span')).toHaveText('6 / 24');
@@ -192,47 +209,100 @@ try {
   ).toBe(false);
   await page.getByRole('button', { name: 'Autoriser les photos caméra', exact: true }).click();
   await page.getByRole('button', { name: 'Choisir un MP3', exact: true }).click();
-  await expect(page.getByText('Musique de démarrage prête')).toBeVisible();
-  await page.getByRole('button', { name: 'Écouter un extrait', exact: true }).click();
+  await expect(page.getByText('tone.mp3', { exact: true })).toBeVisible();
+  const introPreview = page.getByRole('button', {
+    name: 'Écouter · Au début de la session',
+    exact: true,
+  });
+  await introPreview.click();
   await expect.poll(() => page.locator('audio').evaluate((a) => !a.paused)).toBe(true);
-  await page.getByRole('button', { name: 'Arrêter l’écoute', exact: true }).click();
-  await page.getByRole('button', { name: 'Écouter un extrait', exact: true }).click();
   await expect.poll(() => page.locator('audio').evaluate((a) => a.ended && !a.loop)).toBe(true);
   await expect
     .poll(() => page.evaluate(() => window.focusReplay.musicState().then((s) => s.playing)))
     .toBe(false);
-  const launchMusic = page.getByRole('checkbox', {
-    name: 'À l’ouverture de l’application',
-    exact: true,
+  for (const phase of ['launch', 'session'])
+    await page.evaluate((phase) => window.focusReplay.pickMusic(phase), phase);
+  const audioIds = await page.evaluate(() =>
+    window.focusReplay.state().then((s) => Object.values(s.localAudio).map((a) => a.id)),
+  );
+  expect(new Set(audioIds).size).toBe(3);
+  await app.evaluate(async ({ app }) => {
+    const { createRequire } = process.getBuiltinModule('module');
+    const req = createRequire(app.getAppPath() + '/package.json');
+    const { Spotify } = req('./electron/spotify.cjs');
+    globalThis.originalSpotifyMethods = {
+      status: Spotify.prototype.status,
+      search: Spotify.prototype.search,
+      playlists: Spotify.prototype.playlists,
+      request: Spotify.prototype.request,
+    };
+    Spotify.prototype.status = function () {
+      return { connected: true, libraryAccess: true, redirect: 'http://127.0.0.1:43827/callback' };
+    };
+    Spotify.prototype.search = async function () {
+      return {
+        items: [
+          {
+            uri: 'spotify:track:' + 'a'.repeat(22),
+            name: 'Focus test track',
+            subtitle: 'Test artist',
+            image: '',
+          },
+        ],
+        more: false,
+      };
+    };
+    Spotify.prototype.playlists = async function () {
+      return {
+        items: [
+          {
+            uri: 'spotify:playlist:' + 'b'.repeat(22),
+            name: 'My test playlist',
+            subtitle: 'Test owner',
+            image: '',
+          },
+        ],
+        more: false,
+      };
+    };
+    Spotify.prototype.request = async function () {
+      return { devices: [] };
+    };
   });
-  await launchMusic.check();
-  await page
-    .getByRole('combobox', { name: 'Source · À l’ouverture de l’application', exact: true })
-    .selectOption('spotify');
-  await page
-    .getByRole('combobox', { name: 'Choix · À l’ouverture de l’application', exact: true })
-    .selectOption('selection');
-  await page
-    .getByRole('textbox', { name: 'Liens Spotify · À l’ouverture de l’application', exact: true })
-    .fill('spotify:track:' + 'a'.repeat(22) + '\nspotify:track:' + 'b'.repeat(22));
-  await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
-  await page
-    .getByRole('button', { name: 'Écouter · À l’ouverture de l’application', exact: true })
-    .click();
-  await expect(page.getByRole('alert').filter({ hasText: 'Connectez Spotify' })).toBeVisible();
-  await launchMusic.uncheck();
+  await page.reload();
+  await page.getByRole('button', { name: 'Réglages', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'À l’ouverture', exact: true }).check();
+  const launch = page
+    .locator('.music-slot')
+    .filter({ has: page.getByRole('checkbox', { name: 'À l’ouverture', exact: true }) });
+  await launch.getByRole('button', { name: 'Spotify', exact: true }).click();
+  await launch.getByRole('button', { name: 'Titres aléatoires', exact: true }).click();
+  await launch
+    .getByRole('textbox', { name: 'Rechercher un titre · À l’ouverture', exact: true })
+    .fill('focus');
+  await launch.getByRole('button', { name: 'Ajouter · Focus test track', exact: true }).click();
+  await launch.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await expect(
+    launch.getByRole('button', { name: 'Retirer · Focus test track', exact: true }),
+  ).toBeVisible();
   await page.getByRole('checkbox', { name: 'Pendant la session', exact: true }).check();
-  await page
-    .getByRole('combobox', { name: 'Source · Pendant la session', exact: true })
-    .selectOption('spotify');
-  await page
-    .getByRole('combobox', { name: 'Choix · Pendant la session', exact: true })
-    .selectOption('playlist');
-  await page
-    .getByRole('textbox', { name: 'Liens Spotify · Pendant la session', exact: true })
-    .fill('https://open.spotify.com/playlist/' + 'c'.repeat(22));
-  await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  const soundtrack = page
+    .locator('.music-slot')
+    .filter({ has: page.getByRole('checkbox', { name: 'Pendant la session', exact: true }) });
+  await soundtrack.getByRole('button', { name: 'Spotify', exact: true }).click();
+  await soundtrack.getByRole('button', { name: 'Une playlist', exact: true }).click();
+  await soundtrack.getByRole('button', { name: 'Ajouter · My test playlist', exact: true }).click();
+  await soundtrack.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+  await page.screenshot({ path: path.join(root, 'music-picker.png'), fullPage: true });
+  await page.getByRole('checkbox', { name: 'À l’ouverture', exact: true }).uncheck();
   await page.getByRole('checkbox', { name: 'Pendant la session', exact: true }).uncheck();
+  await app.evaluate(async ({ app }) => {
+    const { createRequire } = process.getBuiltinModule('module');
+    Object.assign(
+      createRequire(app.getAppPath() + '/package.json')('./electron/spotify.cjs').Spotify.prototype,
+      globalThis.originalSpotifyMethods,
+    );
+  });
   await page.screenshot({ path: path.join(root, 'settings-light.png'), fullPage: true });
   await page.getByRole('button', { name: 'Retour au replay', exact: true }).click();
   await page.getByRole('button', { name: 'Commencer une session', exact: true }).click();

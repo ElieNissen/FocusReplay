@@ -61,6 +61,7 @@ export function mergeSegments(segments) {
     if (
       previous &&
       previous.app === a.app &&
+      (previous.domain || '') === (a.domain || '') &&
       previous.category === a.category &&
       a.from - previous.to < 5000
     ) {
