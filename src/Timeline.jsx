@@ -20,6 +20,7 @@ export default function Timeline({
 }) {
   const scroll = useRef(null),
     anchor = useRef(null),
+    wheelAnchor = useRef(false),
     latest = useRef({});
   const [viewport, setViewport] = useState(900),
     [shownZoom, setShownZoom] = useState(zoom);
@@ -37,6 +38,7 @@ export default function Timeline({
       if (e.shiftKey) return;
       e.preventDefault();
       const x = e.clientX - el.getBoundingClientRect().left;
+      wheelAnchor.current = true;
       anchor.current = { ratio: (el.scrollLeft + x) / latest.current.width, x };
       setZoom((z) => Math.max(1, Math.min(8, z * (e.deltaY < 0 ? 1.15 : 1 / 1.15))));
     };
@@ -48,11 +50,9 @@ export default function Timeline({
   }, [setZoom]);
   useEffect(() => {
     const el = scroll.current;
-    if (!anchor.current)
-      anchor.current = {
-        ratio: (el.scrollLeft + el.clientWidth / 2) / latest.current.width,
-        x: el.clientWidth / 2,
-      };
+    if (!wheelAnchor.current)
+      anchor.current = { ratio: (cursor - start) / span, x: el.clientWidth / 2 };
+    wheelAnchor.current = false;
     const from = latest.current.shownZoom,
       began = performance.now();
     let frame;

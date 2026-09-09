@@ -249,7 +249,12 @@ export default function App() {
         e.preventDefault();
         latest.current.togglePlay();
       }
-      if (e.target.tagName === 'INPUT') return;
+      if (
+        e.target.tagName === 'INPUT' &&
+        e.target.getAttribute('aria-label') !== 'Curseur de la timeline' &&
+        !['q', 'd'].includes(e.key.toLowerCase())
+      )
+        return;
       if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'q') {
         e.preventDefault();
         latest.current.step(-1);
@@ -695,7 +700,13 @@ export default function App() {
                 </section>
                 <div className="transport">
                   <div className="timestamp" title={current.app}>
-                    <strong>{time(current.at)}</strong>
+                    <strong>
+                      {time(
+                        gaps.some((g) => playheadTime >= g.from && playheadTime < g.to)
+                          ? playheadTime
+                          : current.at,
+                      )}
+                    </strong>
                     <span>
                       {index + 1} / {frames.length}
                     </span>
