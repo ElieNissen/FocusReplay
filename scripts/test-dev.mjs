@@ -29,6 +29,10 @@ try {
     page.getByRole('heading', { name: 'Votre journée — mise à jour', exact: true }),
   ).toBeVisible({ timeout: 15000 });
   expect(await page.evaluate(() => window.__hotReloadProbe)).toBe(42);
+  const watched = Object.keys(server.watcher.getWatched());
+  expect(
+    watched.filter((directory) => /[\\/](work|outputs|release)([\\/]|$)/.test(directory)),
+  ).toEqual([]);
   expect(errors).toEqual([]);
   console.log('PASS: React hot update is visible without reloading the window.');
 } finally {
