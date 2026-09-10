@@ -26,12 +26,12 @@ export default function CheckinOverlay() {
         : theme || 'dark';
   }, [data?.settings.theme]);
   const p = data?.prompt;
-  const submit = async (action) => {
+  const submit = async (action, answer = text) => {
     if (!p || busy) return;
     setBusy(true);
     setError('');
     try {
-      await api.checkinRespond(p.id, action, text);
+      await api.checkinRespond(p.id, action, answer);
     } catch (e) {
       setError(e.message.replace(/^Error invoking remote method '[^']+': Error: /, ''));
       setBusy(false);
@@ -68,6 +68,17 @@ export default function CheckinOverlay() {
                 ? 'Pourquoi tu t’es arrêté ?'
                 : 'Qu’est-ce qui t’a fait décrocher ?'}
           </h1>
+          {p.kind === 'work' && p.previous && (
+            <button
+              type="button"
+              className="repeat-work"
+              title={p.previous}
+              disabled={busy}
+              onClick={() => submit('answer', p.previous)}
+            >
+              Toujours sur « {p.previous} »
+            </button>
+          )}
           {p.kind !== 'work' && (
             <p className="checkin-context">
               {p.kind === 'reason' ? 'Session en pause' : p.domain || p.app}

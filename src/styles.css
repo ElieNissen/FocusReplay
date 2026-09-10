@@ -1930,3 +1930,11 @@ strong {
   font-size: 13px;
   font-weight: 500;
 }
+.repeat-work {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 12px;
+}

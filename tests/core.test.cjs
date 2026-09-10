@@ -434,6 +434,10 @@ test('check-in replies persist; stopped-work pauses once and stale replies canno
   assert.equal(f.r.active.events.at(-1).text, 'Préparer une maquette');
   assert.equal(f.r.active.status, 'recording');
   assert.equal(c.request('work'), false);
+  assert.equal(c.request('work', true), true);
+  assert.equal(c.pending.previous, 'Préparer une maquette');
+  await c.respond(c.pending.id, 'answer', c.pending.previous);
+  assert.equal(f.r.active.events.at(-1).text, 'Préparer une maquette');
   f.advance(600001);
   assert.equal(c.request('drift'), true);
   const id = c.pending.id;
@@ -451,6 +455,8 @@ test('check-in replies persist; stopped-work pauses once and stale replies canno
   await f.r.stop();
   await f.r.start();
   await assert.rejects(c.respond(id, 'pause'), /plus actif/);
+  assert.equal(c.request('work', true), true);
+  assert.equal(c.pending.previous, '');
   assert.equal(f.r.active.status, 'recording');
 });
 
@@ -500,7 +506,7 @@ test('Windows notification inline reply and stop action dispatch their original 
     overlays = [];
   attachNotification(
     n,
-    { id: 'original' },
+    { id: 'original', previous: 'Projet précédent' },
     {
       respond: async (...a) => calls.push(a),
       overlay: (id) => overlays.push(id),
@@ -509,12 +515,14 @@ test('Windows notification inline reply and stop action dispatch their original 
   );
   n.emit('reply', { reply: 'Maquette' });
   n.emit('action', { actionIndex: 0 });
+  n.emit('action', { actionIndex: 1 });
   n.emit('reply', {}, 'Ancienne signature');
   n.emit('click');
   n.emit('failed');
   assert.deepEqual(calls, [
     ['original', 'answer', 'Maquette'],
     ['original', 'pause'],
+    ['original', 'answer', 'Projet précédent'],
     ['original', 'answer', 'Ancienne signature'],
   ]);
   assert.deepEqual(overlays, ['original', 'original']);

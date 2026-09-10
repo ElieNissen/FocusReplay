@@ -52,6 +52,11 @@ class Checkins {
       sessionId: s.id,
       at: this.now(),
       kind,
+      previous:
+        [...s.events]
+          .reverse()
+          .find((e) => e.type === 'checkin' && e.kind === 'work' && e.action === 'answer' && e.text)
+          ?.text || '',
       app: last?.app || '',
       domain: last?.domain || '',
     };
@@ -102,6 +107,8 @@ function attachNotification(notification, prompt, { respond, overlay, fail }) {
   });
   notification.on('action', (event, legacy) => {
     if ((event.actionIndex ?? legacy) === 0) respond(prompt.id, 'pause').catch(fail);
+    if ((event.actionIndex ?? legacy) === 1 && prompt.previous)
+      respond(prompt.id, 'answer', prompt.previous).catch(fail);
   });
   notification.on('click', () => overlay(prompt.id));
   notification.on('failed', () => overlay(prompt.id));

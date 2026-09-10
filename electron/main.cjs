@@ -204,7 +204,10 @@ function showCheckinOverlay(id, focus = false) {
   const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   checkinWindow = new BrowserWindow({
     width: Math.min(420, area.width),
-    height: Math.min(checkins.pending.kind === 'work' ? 260 : 330, area.height),
+    height: Math.min(
+      checkins.pending.kind === 'work' && !checkins.pending.previous ? 260 : 330,
+      area.height,
+    ),
     x: area.x + Math.max(0, area.width - 440),
     y: area.y + Math.max(0, area.height - 350),
     show: false,
@@ -240,7 +243,12 @@ function presentCheckin(prompt, overlay, focus = false) {
     replyPlaceholder: 'Ce que je fais…',
     silent: true,
     icon: icon(),
-    actions: [{ type: 'button', text: 'J’ai arrêté de travailler' }],
+    actions: [
+      { type: 'button', text: 'J’ai arrêté de travailler' },
+      ...(prompt.previous
+        ? [{ type: 'button', text: 'Toujours sur « ' + prompt.previous.slice(0, 60) + ' »' }]
+        : []),
+    ],
   });
   checkinNotification = n;
   attachNotification(n, prompt, {
