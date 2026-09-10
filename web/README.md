@@ -1,3 +1,7 @@
+# FocusReplay web
+
+For a deployment independent of Codex and chatgpt.site, start with [SELF_HOSTING.md](SELF_HOSTING.md). Account registration/login now happens inside the desktop interface; the connection-file flow below is legacy operator compatibility only.
+
 # FocusReplay private profiles
 
 This viewer receives an explicitly selected, reduced copy of the desktop recorder's data. It is not a backup of the desktop database.
@@ -11,7 +15,7 @@ Node 24 is used for tests. Run `npm ci`, `npm run dev`, `npx tsc --noEmit`, `nod
 - `PUBLISHER_KEY` is a random 256-bit **server secret**, never distributed to desktop users. Each desktop receives only `HMAC-SHA256(PUBLISHER_KEY, "publisher:" + profileId)`, plus the site's HTTPS origin and its own profile ID. All database keys and object paths are scoped by profile ID.
 - The URL uses `/?profile=PROFILE_ID`. Profile IDs are public identifiers, not credentials. The owner's desktop sets a separate viewer password for that profile. Viewers receive an HttpOnly, Secure, SameSite cookie scoped to that profile after password verification. Passwords use salted PBKDF2-SHA256. Changing a password invalidates existing viewer cookies.
 - Knowing a profile ID, capture ID or URL does not authorize reading data. Every image request verifies both the profile cookie and current manifest; removing/masking an image revokes its original URL. Owner uploads require that image to appear in that profile's current manifest.
-- No automatic sign-up is enabled. New friends are provisioned by the server operator, with their own derived publishing key. Do not distribute the root server key or reuse another user's connection file. The provisioning script reads the root from an environment variable and writes a connection file to ignored `outputs/`.
+- New accounts register through the desktop UI with an instance invitation code. No unrestricted sign-up is enabled. New friends are provisioned by the server operator, with their own derived publishing key. Do not distribute the root server key or reuse another user's connection file. The provisioning script reads the root from an environment variable and writes a connection file to ignored `outputs/`.
 - A connection file can overwrite its profile's replay and change its viewer password. Treat it as private; never put it on GitHub or give it to viewers.
 
 ## Storage and bandwidth

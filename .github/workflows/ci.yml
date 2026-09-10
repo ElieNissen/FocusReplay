@@ -39,3 +39,13 @@ jobs:
       - run: npx tsc --noEmit
       - run: node --test tests/*.test.mjs
       - run: npm run build
+      - run: npm run build:standalone
+      - run: docker build -t focusreplay-test .
+      - run: |
+          docker run -d --name focusreplay-test -p 127.0.0.1:8787:8787 -e PUBLIC_ORIGIN=http://localhost:8787 focusreplay-test
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:8787/ > /dev/null; then break; fi
+            sleep 1
+          done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8787/api/p/example/snapshot)" = 401
+          docker rm -f focusreplay-test
