@@ -16,7 +16,7 @@
 - **Soft sound design:** synthesized interaction sounds and reminder chimes, with independent volume and mute. No downloaded sound assets.
 - **Start music:** import an independent MP3 for app launch, session intro and the session soundtrack; each track plays once without looping. Optional Spotify music supports app launch, session intro and a session soundtrack.
 - **MP4 export:** one click exports the selected day or session in 1080p, at the current playback speed. Large timestamps, software names/durations, category bands and a moving timeline show the context. Explorer reveals the finished video.
-- **Bounded storage:** compressed JPEGs, 3-day retention and 1 GB capture cap by default.
+- **Bounded storage:** compressed JPEGs, 90-day retention (subject to the storage cap) and 1 GB capture cap by default.
 - **Dark and light themes**, plus Windows theme preference.
 - **Optional camera photos:** off by default, explicit in-app consent, no microphone. A camera photo accompanies each screenshot and appears in picture-in-picture during replay and optionally in the MP4. Camera access stops during pauses, locking and session end.
 - **Optional rewards:** accumulated work minutes unlock custom break/game/movie rewards directly. Each reward states its required work minutes and reward duration. Milestones celebrate 25 minutes, 1, 2, 4 and 8 hours of cumulative eligible work. Normal pauses remain free.
@@ -67,7 +67,7 @@ Data lives outside the repository, normally in `%APPDATA%/FocusReplay`. Use **RÃ
 
 Advanced: launch with `--focus-data-dir="D:\FocusReplayData"` to choose a separate local profile. Keep that folder private and outside your source repository.
 
-See [SECURITY.md](SECURITY.md) for exact data flow, retention and limitations. Capture files stay local and are not encrypted by the app. Optional Spotify credentials use Windows encryption.
+See [SECURITY.md](SECURITY.md) for exact data flow, retention and limitations. Original capture files stay local and are not encrypted by the app. Optional private-profile sharing uploads a reduced, filtered copy. Optional Spotify credentials use Windows encryption.
 
 ## Music (Spotify or local MP3)
 
@@ -134,3 +134,11 @@ The software lane uses fixed chronological overview blocks. The dominant applica
 Rewards now accrue one work minute per eligible observed minute. A reward might exchange 25 work minutes for 5 break minutes. Existing point balances and reward costs migrate once using the last configured points-per-hour rate; costs round up to a whole minute. Subsequent work accrues directly, independently of that legacy rate. Already crossed milestones are marked during migration without replaying notifications.
 
 `npm run test:timeline` generates a fictional ten-hour day with rapid app switches and verifies grouping, pauses, Q/D and thumbnail stability during zoom.
+
+## Private profile (0.7)
+
+Open **Profil**, choose **Connecter mon profil**, and select the private connection JSON supplied by your site operator. Set a viewer password (12â€“128 characters), review privacy rules, then activate sharing. Nothing uploads before you enable it. Viewers need only your profile URL and viewer password, never the connection file. Stop and remove sharing from this same screen.
+
+Online history progressively thins older images to keep up to 90 days within 800 images (40 MB maximum). Daily totals remain lightweight and independent of screenshots. Local originals default to 90 days, up to one year in Settings, while the 1 GB default cap still applies. Existing three-day defaults migrate to 90 days; other choices stay unchanged. Exports remain outside automatic cleanup.
+
+See [web/README.md](web/README.md) for storage tiers, profile isolation, operational limitations and the social-network roadmap.
