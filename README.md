@@ -142,3 +142,9 @@ Open **Profil**, choose **Connecter mon profil**, and select the private connect
 Online history progressively thins older images to keep up to 90 days within 800 images (40 MB maximum). Daily totals remain lightweight and independent of screenshots. Local originals default to 90 days, up to one year in Settings, while the 1 GB default cap still applies. Existing three-day defaults migrate to 90 days; other choices stay unchanged. Exports remain outside automatic cleanup.
 
 See [web/README.md](web/README.md) for storage tiers, profile isolation, operational limitations and the social-network roadmap.
+
+## Independent hosting and accounts (0.8)
+
+The recommended connection flow is now **Profil → Créer mon compte / Se connecter**, using your server URL, account identifier and password. New accounts require the server’s invitation code. No connection file is needed. Existing encrypted legacy connections keep working.
+
+Deploy your own server from this repository using [the standalone guide](web/SELF_HOSTING.md). The [social roadmap](docs/SOCIAL_ROADMAP.md) separates accounts, friends and screenshot grants.

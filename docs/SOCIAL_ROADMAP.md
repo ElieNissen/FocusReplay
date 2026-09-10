@@ -1,0 +1,29 @@
+# From personal replay to a small productive social network
+
+## Ownership boundary
+
+A profile belongs to an account. Owning a profile, knowing its viewer password, being its friend and being allowed to inspect its screenshots are distinct capabilities. Do not turn the current viewer password into account login or let a public profile imply replay access.
+
+## Delivery stages
+
+1. **Independent base (this change):** standalone deployment, persisted per-instance secrets, invitation-gated account registration and desktop login without files. Existing replay isolation and per-profile image budgets remain. No public account directory or open sign-up.
+2. **Account management:** owner sessions and per-device tokens with revocation, password change/recovery, one-use expiring invitations, account deletion with verified image cleanup, and a minimal operator interface. Add an immutable account ID distinct from the editable public handle before building friendships. Migrate legacy accounts only with proof of existing ownership. This is the next release gate before inviting a larger audience.
+3. **Small friends network:** explicit profile visibility, invitations/friend requests, accepted relationships and blocking. A people page lists only profiles the current account may discover. Show live/paused/offline presence with expiry, a chosen display name/avatar, and aggregate work activity. Each user opts in to these fields. Screenshots stay private behind a separate grant, and the default social feed contains no images or window titles.
+4. **Replay grants:** named viewers, revocable access, optional time-limited links, a clear visible audience beside the sharing control, and independent permissions for status, daily totals, software names and images. Existing shared viewer passwords remain a limited compatibility path, then expire.
+5. **Encouragement:** reactions, milestones and voluntary group sessions based on aggregate data, with mute/block controls. Avoid public comparisons of private screenshots and forced leaderboards. Activity classification remains an estimate that the owner can correct.
+
+## Storage and scale
+
+Today the desktop compresses and samples images before sending, and the server applies an authenticated manifest and an image budget. At 40 MB of active images each, 100 profiles need up to 4 GB and 1,000 profiles up to 40 GB, excluding backups and metadata. These are capacity estimates, not concurrent-user performance claims.
+
+For a multi-server service, retain the authorization boundary and replace the single SQLite datastore with PostgreSQL (accounts, devices, relationships, grants, sessions, daily totals and media index) and filesystem objects with private S3-compatible storage. Use explicit account/profile foreign keys in every table and object namespace; authorization belongs in services and queries, not only routes. Keep SQL/D1 adapters and object storage adapters separate from the access-control logic.
+
+Before that migration: replace the JSON manifest as the media authorization index with indexed image records; introduce incremental uploads, per-account and global quotas, a durable cleanup queue, scheduled object-lifecycle enforcement and private authenticated caching. Presence should expire independently of screenshots; start with short polling, then use server events if load measurements justify it. Do not proxy private images through public cache URLs.
+
+## Gates for broader release
+
+Measure upload/read bandwidth, datastore operations, cleanup lag and failed removals without collecting screenshot content. Run realistic concurrent-viewer and registration abuse tests. Add cross-account tests for every new social endpoint, explicit permission-change tests, restore drills, audit events for grants, device revocation, blocking and account removal. No open registration until account recovery, quotas, abuse controls, moderation and deletion guarantees are operational.
+
+## UI direction
+
+The desktop keeps recording and replay as its main surface. Profile contains account and audience controls. A separate **Friends** view shows permitted profiles and current presence. The website uses the same account identity and permissions; embedding it later in the app must not create a second authentication system or expose native recording APIs to remote content.
