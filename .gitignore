@@ -30,3 +30,5 @@ Thumbs.db
 *.pem
 *.key
 *.pfx
+share-auth.bin*
+*.connection.json

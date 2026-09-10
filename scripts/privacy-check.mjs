@@ -23,7 +23,7 @@ for (const file of new Set(files)) {
     continue;
   }
   if (/\.(png|ico)$/i.test(file)) {
-    if (!/^(build\/icon\.(png|ico)|docs\/images\/[a-z-]+\.png)$/.test(file))
+    if (!/^(build\/icon\.(png|ico)|web\/public\/icon\.png|docs\/images\/[a-z-]+\.png)$/.test(file))
       failures.push(file + ': image not explicitly allowlisted');
     continue;
   }
