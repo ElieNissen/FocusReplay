@@ -21,6 +21,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { randomUUID } = require('node:crypto');
 const { Recorder, selectFrames } = require('./core.cjs');
+const { Publisher } = require('./publisher.cjs');
 const { Checkins, attachNotification } = require('./checkins.cjs');
 const { startTracker } = require('./tracker.cjs');
 const { exportVideo } = require('./export.cjs');
@@ -54,6 +55,7 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 const iconAttempts = new Map();
+let publisher, shareTimer;
 let checkins, checkinWindow, checkinNotification;
 let main,
   widget,
@@ -614,6 +616,9 @@ else {
           return new Response('Introuvable', { status: 404 });
         }
       });
+      publisher = new Publisher({ recorder, safeStorage, nativeImage });
+      await publisher.init();
+      shareTimer = setInterval(() => publisher.sync().then(() => recorder.changed()), 30000);
       checkins = new Checkins({ recorder, present: presentCheckin, close: closeCheckin, showMain });
       createMain();
       tray = new Tray(icon());
@@ -641,7 +646,7 @@ else {
             recorder.data.settings.browserHints,
             recorder.data.settings.browserDomains,
           );
-        send('focus:change', state);
+        send('focus:change', { ...state, share: publisher.state() });
         updateTray();
         updateWidget();
       });
@@ -656,7 +661,58 @@ else {
         );
         send('focus:break-ended', { name: reward.name });
       });
-      bind('state', () => ({ ...recorder.snapshot(), exportState, version: app.getVersion() }));
+      bind('state', () => ({
+        ...recorder.snapshot(),
+        share: publisher.state(),
+        exportState,
+        version: app.getVersion(),
+      }));
+      bind('shareConnect', async () => {
+        if (recorder.data.settings.shareEnabled || publisher.auth?.pendingClear)
+          throw Error('Arrêtez le partage avant de changer de connexion.');
+        const selected = await dialog.showOpenDialog(main, {
+          title: 'Connecter un profil privé',
+          properties: ['openFile'],
+          filters: [{ name: 'Connexion FocusReplay', extensions: ['json'] }],
+        });
+        if (selected.filePaths?.length) await publisher.connect(selected.filePaths[0]);
+        recorder.changed();
+        return publisher.state();
+      });
+      bind('shareConfigure', async (password) => {
+        await publisher.configure(password);
+        recorder.changed();
+        return publisher.state();
+      });
+      bind('shareEnable', async (enabled) => {
+        if (typeof enabled !== 'boolean') throw Error('Action invalide.');
+        if (enabled && !publisher.auth?.configured)
+          throw Error('Connectez un profil et choisissez son mot de passe.');
+        if (enabled && publisher.auth?.pendingClear) await publisher.clear();
+        await recorder.settings({ shareEnabled: enabled });
+        if (enabled) await publisher.sync();
+        else await publisher.clear();
+        recorder.changed();
+        return publisher.state();
+      });
+      bind('shareOpen', () => {
+        if (publisher.auth) shell.openExternal(publisher.state().url);
+      });
+      bind('shareMask', async (id) => {
+        await recorder.run(async () => {
+          const frame = recorder.data.sessions.flatMap((s) => s.frames).find((f) => f.id === id);
+          if (!frame) throw Error('Capture introuvable.');
+          frame.private = true;
+          await recorder.save();
+          recorder.changed();
+        });
+        await publisher.sync();
+        recorder.changed();
+        if (publisher.error)
+          throw Error(
+            'Masquage local enregistré, mais le retrait en ligne a échoué : ' + publisher.error,
+          );
+      });
       bind('checkinState', () => checkins.state());
       bind('checkinRespond', (...args) => checkins.respond(...args));
       bind('checkinPreview', () => checkins.request('work', true));
@@ -726,7 +782,17 @@ else {
         }
         if (settings.cameraEnabled === true && !cameraConsent)
           throw new Error('Autorisez d’abord la caméra dans les réglages.');
+        if (Object.hasOwn(settings, 'shareEnabled'))
+          throw Error('Utilisez le contrôle de partage du profil.');
         await recorder.settings(settings);
+        if (settings.privateApps || settings.privateDomains) {
+          await publisher.sync();
+          recorder.changed();
+          if (publisher.error)
+            throw Error(
+              'Règle enregistrée, mais le retrait en ligne a échoué : ' + publisher.error,
+            );
+        }
         if (settings.musicSlots || (localMusic && settings.musicEnabled === false))
           musicDirector.stop();
         if (
@@ -905,6 +971,7 @@ else {
     if (closing) return;
     closing = true;
     clearInterval(timer);
+    clearInterval(shareTimer);
     tracker?.stop();
     stopCamera();
     exportJob?.abort();

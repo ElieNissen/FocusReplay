@@ -11,7 +11,7 @@ public static class ForegroundApp {
   public static int Id() { uint value; GetWindowThreadProcessId(GetForegroundWindow(), out value); return (int)value; }
 }
 '@
-if ($env:FOCUS_BROWSER_DOMAINS -eq '1') {
+if ($true) {
   Add-Type -AssemblyName UIAutomationClient
   Add-Type -AssemblyName UIAutomationTypes
 }
@@ -49,6 +49,8 @@ while ($true) {
     $foregroundProcess = Get-Process -Id $foregroundId -ErrorAction Stop
     $foregroundName = $foregroundProcess.ProcessName
     $executable = $foregroundProcess.Path
+    $sensitive = $false
+    try { $sensitive = [System.Windows.Automation.AutomationElement]::FocusedElement.Current.IsPassword } catch {}
     $hint = 'unknown'
     $domain = ''
     if ($env:FOCUS_BROWSER_DOMAINS -eq '1' -and $foregroundName -match '^(chrome|msedge|firefox|brave|opera)$') { $domain = Get-BrowserDomain }
@@ -60,7 +62,7 @@ while ($true) {
       $windowText = $null
     }
     if ([ForegroundApp]::Id() -ne $foregroundId) { throw 'Foreground changed' }
-    @{ name = $foregroundName; hint = $hint; domain = $domain; executable = $executable } | ConvertTo-Json -Compress
+    @{ name = $foregroundName; hint = $hint; domain = $domain; executable = $executable; sensitive = $sensitive } | ConvertTo-Json -Compress
   } catch { '{"name":null}' }
   Start-Sleep -Seconds 2
 }

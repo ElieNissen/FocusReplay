@@ -17,6 +17,7 @@ export default function Timeline({
   seek,
   settings,
   onRule,
+  onPrivacy,
 }) {
   const scroll = useRef(null),
     anchor = useRef(null),
@@ -116,6 +117,16 @@ export default function Timeline({
             </div>
           )}
           <strong>{editing.domain || editing.app}</strong>
+          {onPrivacy &&
+            [
+              ['privateApps', editing.app.toLowerCase()],
+              ...(editing.domain ? [['privateDomains', editing.domain]] : []),
+            ].map(([key, value]) => (
+              <button key={key} onClick={() => onPrivacy(key, value)}>
+                {settings[key]?.includes(value) ? 'Ne plus masquer' : 'Masquer'} {value} dans le
+                partage
+              </button>
+            ))}
           {[
             ['appRules', editing.app.toLowerCase(), editing.app],
             ...(editing.domain ? [['siteRules', editing.domain, editing.domain]] : []),

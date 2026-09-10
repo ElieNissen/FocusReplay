@@ -63,12 +63,13 @@ function startTracker(browserHints = true, browserDomains = false) {
     );
     readline.createInterface({ input: child.stdout }).on('line', (line) => {
       try {
-        const { name: n, hint, domain, executable } = JSON.parse(line);
+        const { name: n, hint, domain, executable, sensitive } = JSON.parse(line);
         name =
           typeof n === 'string'
             ? {
                 app: (NAMES[n] || n).slice(0, 100),
                 category: classify(n, hint),
+                sensitive: sensitive === true,
                 executable:
                   typeof executable === 'string' &&
                   path.isAbsolute(executable) &&

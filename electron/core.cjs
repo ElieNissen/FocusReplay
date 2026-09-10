@@ -8,7 +8,7 @@ const { defaults: musicSlots, validateMusic } = require('./music-config.cjs');
 
 const DEFAULTS = Object.freeze({
   interval: 60,
-  retentionDays: 3,
+  retentionDays: 90,
   maxMB: 1024,
   width: 1920,
   quality: 72,
@@ -33,6 +33,9 @@ const DEFAULTS = Object.freeze({
   siteRules: {},
   browserDomains: false,
   driftPromptEnabled: false,
+  shareEnabled: false,
+  privateApps: [],
+  privateDomains: [],
 });
 const DEFAULT_REWARDS = [
   { id: 'stretch', name: 'Se lever et souffler', minutes: 5, cost: 25 },
@@ -74,7 +77,7 @@ function validateSettings(input, previous = DEFAULTS) {
   const s = { ...previous };
   const bounds = {
     interval: [10, 600],
-    retentionDays: [1, 30],
+    retentionDays: [1, 365],
     maxMB: [100, 10240],
     width: [960, 2560],
     quality: [40, 90],
@@ -85,7 +88,17 @@ function validateSettings(input, previous = DEFAULTS) {
     pointsPerHour: [1, 1000],
   };
   for (const [key, value] of Object.entries(input || {})) {
-    if (key === 'musicSlots') {
+    if (key === 'privateApps' || key === 'privateDomains') {
+      if (
+        !Array.isArray(value) ||
+        value.length > 200 ||
+        value.some((v) => typeof v !== 'string' || !v.trim() || v.length > 100)
+      )
+        throw Error('Liste privée invalide.');
+      s[key] = [...new Set(value.map((v) => v.trim().toLowerCase()))];
+      if (key === 'privateDomains' && s[key].some((v) => domainOnly(v) !== v))
+        throw Error('Indiquez uniquement les domaines.');
+    } else if (key === 'musicSlots') {
       s.musicSlots = validateMusic(value);
     } else if (key === 'spotifyDevice') {
       if (typeof value !== 'string' || value.length > 200)
@@ -125,6 +138,7 @@ function validateSettings(input, previous = DEFAULTS) {
       [
         'musicEnabled',
         'soundEnabled',
+        'shareEnabled',
         'widget',
         'browserHints',
         'browserDomains',
@@ -213,6 +227,10 @@ class Recorder extends EventEmitter {
           'Les données locales sont illisibles. Elles ont été conservées. Fermez FocusReplay et sauvegardez son dossier de données avant réparation.',
         );
     }
+    if (!this.data.retentionPolicy) {
+      if (this.data.settings.retentionDays === 3) this.data.settings.retentionDays = 90;
+      this.data.retentionPolicy = 2;
+    }
     this.data.wallet ||= newWallet();
     const wallet = this.data.wallet;
     if (wallet.unit !== 'work-minutes') {
@@ -227,6 +245,17 @@ class Recorder extends EventEmitter {
       wallet.milestone =
         [25, 60, 120, 240, 480].filter((n) => wallet.workMs >= n * 60000).at(-1) || 0;
     }
+    this.data.activityDays ||= Object.fromEntries(
+      [...new Set(this.data.sessions.flatMap((s) => s.activity.map((a) => dayKey(a.from))))].map(
+        (day) => [
+          day,
+          this.data.sessions
+            .flatMap((s) => s.activity)
+            .filter((a) => dayKey(a.from) === day && a.category === 'work')
+            .reduce((n, a) => n + a.ms, 0),
+        ],
+      ),
+    );
     this.applyRules();
     this.data.pauseTimer = null;
     for (const s of this.data.sessions)
@@ -425,11 +454,26 @@ class Recorder extends EventEmitter {
       : (siteCategory(domain) ?? classify(app, detected));
   }
   applyRules() {
+    const before = {};
+    for (const session of this.data.sessions)
+      for (const a of session.activity)
+        if (a.category === 'work') before[dayKey(a.from)] = (before[dayKey(a.from)] || 0) + a.ms;
     for (const session of this.data.sessions)
       for (const item of [...session.activity, ...session.frames]) {
         item.detectedCategory ??= item.category || 'unknown';
         item.category = this.categoryFor(item.app, item.detectedCategory, item.domain);
       }
+    if (this.data.activityDays) {
+      const after = {};
+      for (const session of this.data.sessions)
+        for (const a of session.activity)
+          if (a.category === 'work') after[dayKey(a.from)] = (after[dayKey(a.from)] || 0) + a.ms;
+      for (const day of new Set([...Object.keys(before), ...Object.keys(after)]))
+        this.data.activityDays[day] = Math.max(
+          0,
+          (this.data.activityDays[day] || 0) + (after[day] || 0) - (before[day] || 0),
+        );
+    }
   }
   async settings(input) {
     return this.run(async () => {
@@ -487,6 +531,7 @@ class Recorder extends EventEmitter {
             last.app === name &&
             (last.domain || '') === domain &&
             last.category === cat &&
+            Boolean(last.sensitive) === Boolean(activity?.sensitive) &&
             last.detectedCategory === (this.idle() >= 300 ? 'idle' : detectedCategory) &&
             at - last.to < 6000 &&
             dayKey(last.from) === dayKey(at)
@@ -496,6 +541,7 @@ class Recorder extends EventEmitter {
           } else
             s.activity.push({
               app: String(name).slice(0, 100),
+              sensitive: Boolean(activity?.sensitive),
               domain,
               category: cat,
               detectedCategory: this.idle() >= 300 ? 'idle' : detectedCategory,
@@ -503,6 +549,10 @@ class Recorder extends EventEmitter {
               to: at,
               ms: elapsed,
             });
+          if (cat === 'work') {
+            this.data.activityDays[dayKey(at)] =
+              (this.data.activityDays[dayKey(at)] || 0) + elapsed;
+          }
           if (
             this.data.settings.rewardsEnabled &&
             !wallet.activeBreak &&
@@ -558,6 +608,7 @@ class Recorder extends EventEmitter {
               id,
               at: capturedAt || this.now(),
               interval: this.data.settings.interval,
+              private: Boolean(activity?.sensitive),
               app: name || 'Logiciel non identifié',
               domain,
               category: this.idle() >= 300 ? 'idle' : category,

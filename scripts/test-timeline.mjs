@@ -132,6 +132,23 @@ try {
     await page.locator('.timeline-inner').evaluate((e) => e.getBoundingClientRect().height),
   ).toBe(190);
   await page.screenshot({ path: path.join(root, 'zoom-pause.png'), fullPage: true });
+  await page
+    .getByRole('button', { name: 'Masquer cette capture dans le partage', exact: true })
+    .click();
+  await expect(page.getByRole('button', { name: 'Capture privée', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: 'Profil', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Profil', exact: true })).toBeVisible();
+  await expect(page.locator('.profile-calendar span')).toHaveCount(364);
+  await page.getByLabel('Sites', { exact: true }).fill('mail.example');
+  await page.getByRole('button', { name: 'Masquer dans Sites', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'mail.example', exact: true })).toBeVisible();
+  const state = await page.evaluate(() => window.focusReplay.state());
+  expect(state.settings.privateDomains).toEqual(['mail.example']);
+  expect(state.settings.shareEnabled).toBe(false);
+  expect(Object.values(state.activityDays).some((ms) => ms > 0)).toBe(true);
+  await page.screenshot({ path: path.join(root, 'profile-dark.png'), fullPage: true });
+  await page.evaluate(() => window.focusReplay.settings({ theme: 'light' }));
+  await page.screenshot({ path: path.join(root, 'profile-light.png'), fullPage: true });
   console.log(
     'PASS: full-day rapid switches, pause gaps, Q/D, stable thumbnails and fixed-height zoom. ' +
       root,

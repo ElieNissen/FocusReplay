@@ -85,6 +85,7 @@ test('recovery ends interrupted sessions without restarting surveillance', async
 });
 test('retention protects exports, then removes expired captures and activity', async (t) => {
   const f = await fixture(t);
+  await f.r.settings({ retentionDays: 3 });
   await f.r.start();
   await f.r.tick();
   await f.r.stop();

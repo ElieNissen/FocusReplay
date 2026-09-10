@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Profile from './Profile';
 import SettingsView from './SettingsView';
 import Timeline from './Timeline';
 import AppIcon from './AppIcon';
@@ -402,6 +403,15 @@ export default function App() {
         </nav>
         <footer className="sidebar-footer">
           <button
+            className={view === 'profile' ? 'selected' : ''}
+            onClick={() => {
+              setView('profile');
+              setPlaying(false);
+            }}
+          >
+            <Activity size={17} /> Profil
+          </button>
+          <button
             className={view === 'rewards' ? 'selected' : ''}
             onClick={() => {
               setView('rewards');
@@ -566,7 +576,9 @@ export default function App() {
             <span>{data.cameraWarning}</span>
           </div>
         )}
-        {view === 'rewards' ? (
+        {view === 'profile' ? (
+          <Profile data={data} busy={busy} act={act} onBack={() => setView('replay')} />
+        ) : view === 'rewards' ? (
           <Rewards
             data={data}
             clock={clock}
@@ -749,6 +761,13 @@ export default function App() {
                     <output>{speed} img/s</output>
                   </label>
                 </div>
+                <button
+                  className="text-button"
+                  disabled={busy || current.private}
+                  onClick={() => act(() => api.shareMask(current.id))}
+                >
+                  {current.private ? 'Capture privée' : 'Masquer cette capture dans le partage'}
+                </button>
                 <Timeline
                   frames={frames}
                   segments={softwareSegments}
@@ -762,6 +781,15 @@ export default function App() {
                   setZoom={setTimelineZoom}
                   seek={seek}
                   settings={settings}
+                  onPrivacy={(key, value) =>
+                    act(() =>
+                      api.settings({
+                        [key]: settings[key]?.includes(value)
+                          ? settings[key].filter((v) => v !== value)
+                          : [...(settings[key] || []), value],
+                      }),
+                    )
+                  }
                   onRule={(key, value, category) =>
                     act(() => {
                       const rules = { ...settings[key] };

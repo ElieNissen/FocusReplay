@@ -106,6 +106,9 @@ export default function SettingsView({ settings, data, busy, act, onBack, musicS
             [7, '7 jours'],
             [14, '14 jours'],
             [30, '30 jours'],
+            [90, '90 jours'],
+            [180, '180 jours'],
+            [365, '1 an'],
           ],
           'Les plus anciennes sont supprimées automatiquement, avec leur historique associé.',
         )}
