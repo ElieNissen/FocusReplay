@@ -62,6 +62,55 @@ class Publisher {
     await this.save();
     return this.state();
   }
+  async login({ url: address, profile, password, invitation, register = false }) {
+    const url = new URL(address);
+    if (
+      (url.protocol !== 'https:' &&
+        !(
+          url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)
+        )) ||
+      url.username ||
+      url.password ||
+      url.pathname !== '/' ||
+      url.search ||
+      url.hash
+    )
+      throw Error('Utilisez l’adresse HTTPS de votre serveur.');
+    if (
+      !/^[a-z0-9][a-z0-9-]{2,39}$/.test(profile || '') ||
+      typeof password !== 'string' ||
+      password.length < 12 ||
+      password.length > 128
+    )
+      throw Error('Vérifiez votre identifiant et votre mot de passe.');
+    const response = await this.fetcher(
+      url.origin + '/api/account/' + (register ? 'register' : 'login'),
+      {
+        method: 'POST',
+        redirect: 'error',
+        signal: AbortSignal.timeout(20000),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile, password, invitation }),
+      },
+    );
+    const value = await response.json();
+    if (!response.ok) throw Error(value.error || 'Connexion impossible.');
+    if (!/^[a-f0-9]{64}$/.test(value.key) || value.profile !== profile)
+      throw Error('Réponse du serveur invalide.');
+    const since =
+      this.auth?.profile === profile && this.auth.url === url.origin ? this.auth.since : Date.now();
+    this.auth = {
+      url: url.origin,
+      profile,
+      key: value.key,
+      configured: value.configured === true,
+      since,
+    };
+    await this.save();
+    this.uploaded.clear();
+    this.error = '';
+    return this.state();
+  }
   async request(route, options = {}) {
     const r = await this.fetcher(
       this.auth.url + '/api/p/' + this.auth.profile + route.replace(/^\/api/, ''),

@@ -667,6 +667,13 @@ else {
         exportState,
         version: app.getVersion(),
       }));
+      bind('shareLogin', async (value) => {
+        if (recorder.data.settings.shareEnabled || publisher.auth?.pendingClear)
+          throw Error('Arrêtez le partage avant de changer de compte.');
+        const result = await publisher.login(value);
+        recorder.changed();
+        return result;
+      });
       bind('shareConnect', async () => {
         if (recorder.data.settings.shareEnabled || publisher.auth?.pendingClear)
           throw Error('Arrêtez le partage avant de changer de connexion.');

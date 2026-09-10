@@ -6,6 +6,12 @@ export default function Profile({ data, busy, act, onBack }) {
   const [password, setPassword] = useState(''),
     [app, setApp] = useState(''),
     [domain, setDomain] = useState('');
+  const [connecting, setConnecting] = useState(false),
+    [register, setRegister] = useState(false),
+    [address, setAddress] = useState(data.share?.url ? new URL(data.share.url).origin : ''),
+    [profile, setProfile] = useState(''),
+    [accountPassword, setAccountPassword] = useState(''),
+    [invitation, setInvitation] = useState('');
   const share = data.share || {},
     settings = data.settings;
   const days = Array.from({ length: 364 }, (_, i) => {
@@ -58,10 +64,87 @@ export default function Profile({ data, busy, act, onBack }) {
       </section>
       <section className="profile-sharing">
         <h2>Partager mon replay</h2>
-        {!share.connected ? (
-          <button disabled={busy} onClick={() => act(() => api.shareConnect())}>
-            <Link size={16} /> Connecter mon profil
-          </button>
+        {!share.connected || connecting ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              act(async () => {
+                await api.shareLogin({
+                  url: address,
+                  profile,
+                  password: accountPassword,
+                  invitation,
+                  register,
+                });
+                setAccountPassword('');
+                setInvitation('');
+                setConnecting(false);
+              });
+            }}
+          >
+            <div className="profile-row">
+              <button type="button" aria-pressed={!register} onClick={() => setRegister(false)}>
+                Se connecter
+              </button>
+              <button type="button" aria-pressed={register} onClick={() => setRegister(true)}>
+                Créer mon compte
+              </button>
+            </div>
+            <div className="profile-row">
+              <label>
+                Adresse du serveur
+                <input
+                  type="url"
+                  required
+                  value={address}
+                  placeholder="https://mon-serveur.fr"
+                  onChange={(e) => setAddress(e.target.value)}
+                />
+              </label>
+              <label>
+                Identifiant
+                <input
+                  autoComplete="username"
+                  required
+                  pattern="[a-z0-9][a-z0-9-]{2,39}"
+                  value={profile}
+                  onChange={(e) => setProfile(e.target.value.toLowerCase())}
+                />
+              </label>
+            </div>
+            <div className="profile-row">
+              <label>
+                Mot de passe du compte
+                <input
+                  type="password"
+                  autoComplete={register ? 'new-password' : 'current-password'}
+                  required
+                  minLength={12}
+                  maxLength={128}
+                  value={accountPassword}
+                  onChange={(e) => setAccountPassword(e.target.value)}
+                />
+              </label>
+              {register && (
+                <label>
+                  Code d’invitation
+                  <input
+                    required
+                    value={invitation}
+                    onChange={(e) => setInvitation(e.target.value.trim())}
+                  />
+                </label>
+              )}
+            </div>
+            <button className="primary" disabled={busy}>
+              {register ? 'Créer mon compte' : 'Connecter mon profil'}
+            </button>
+            {share.connected && (
+              <button type="button" onClick={() => setConnecting(false)}>
+                Annuler
+              </button>
+            )}
+          </form>
         ) : (
           <>
             <div className="profile-row">
@@ -113,11 +196,7 @@ export default function Profile({ data, busy, act, onBack }) {
               </button>
             )}
             {!share.enabled && (
-              <button
-                className="text-button"
-                disabled={busy}
-                onClick={() => act(() => api.shareConnect())}
-              >
+              <button className="text-button" disabled={busy} onClick={() => setConnecting(true)}>
                 Changer de connexion
               </button>
             )}
