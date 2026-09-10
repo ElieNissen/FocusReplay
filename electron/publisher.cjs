@@ -101,6 +101,7 @@ class Publisher {
     await this.save();
     this.uploaded.clear();
     this.lastSync = 0;
+    this.error = '';
     return this.state();
   }
   sync() {

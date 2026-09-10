@@ -122,3 +122,39 @@ test('adaptive history covers 90 days with a strict 800-image budget and re-mask
   assert.equal(merged.frames[0].available, false);
   assert.equal(merged.frames[0].app, 'Données privées');
 });
+test('failed online removal survives restart and clears its warning after a successful retry', async (t) => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'focus-share-removal-'));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const d = data();
+  d.settings.shareEnabled = false;
+  const storage = {
+    isEncryptionAvailable: () => true,
+    encryptString: (s) => Buffer.from(s),
+    decryptString: (b) => b.toString(),
+  };
+  const recorder = { dir, data: d };
+  const p = new Publisher({
+    recorder,
+    safeStorage: storage,
+    fetcher: async () => new Response('', { status: 503 }),
+  });
+  p.auth = { url: 'https://example.test', profile: 'alice', key: 'a'.repeat(64), configured: true };
+  await assert.rejects(p.clear());
+  assert.equal(p.auth.pendingClear, true);
+  let calls = 0;
+  const r = new Publisher({
+    recorder,
+    safeStorage: storage,
+    fetcher: async (url, options) => {
+      calls++;
+      assert.equal(options.method, 'DELETE');
+      return new Response('{}');
+    },
+  });
+  await r.init();
+  r.error = 'Connection failed';
+  await r.sync();
+  assert.equal(calls, 1);
+  assert.equal(r.state().pendingRemoval, false);
+  assert.equal(r.state().error, '');
+});
