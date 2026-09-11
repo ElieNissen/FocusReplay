@@ -158,3 +158,18 @@ test('failed online removal survives restart and clears its warning after a succ
   assert.equal(r.state().pendingRemoval, false);
   assert.equal(r.state().error, '');
 });
+test('local privacy indicators agree with online masking including adjacent captures', () => {
+  const { localPrivacy, hidden } = require('../electron/share-snapshot.cjs');
+  const settings = { privateApps: ['notion'], privateDomains: ['private.example'] };
+  const frames = [5, 20, 40, 80].map((at) => ({ id: String(at), at: at * 1000, app: 'Editor' }));
+  const activity = [{ from: 30000, to: 50000, app: 'Brave', domain: 'sub.private.example' }];
+  const data = { settings, sessions: [{ frames, activity }] };
+  const result = localPrivacy(data);
+  assert.deepEqual(
+    result.sessions[0].frames.map((f) => f.sharedPrivate),
+    [false, true, true, false],
+  );
+  assert.equal(result.sessions[0].activity[0].sharedPrivate, true);
+  assert.equal(hidden({ app: 'Notion' }, settings), true);
+  assert.equal(data.sessions[0].frames[0].sharedPrivate, undefined);
+});

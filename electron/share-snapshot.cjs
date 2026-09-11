@@ -117,4 +117,41 @@ function buildSnapshot(data, since, now = Date.now()) {
     days: Object.entries(data.activityDays || {}).map(([day, workMs]) => ({ day, workMs })),
   };
 }
-module.exports = { hidden, buildSnapshot };
+function localPrivacy(data) {
+  const settings = data.settings;
+  const intervals = data.sessions
+    .flatMap((s) => s.activity)
+    .filter((a) => hidden(a, settings))
+    .map((a) => ({ from: a.from - 10000, to: a.to + 10000 }))
+    .sort((a, b) => a.from - b.from);
+  const merged = [];
+  for (const interval of intervals) {
+    const last = merged.at(-1);
+    if (last && interval.from <= last.to) last.to = Math.max(last.to, interval.to);
+    else merged.push({ ...interval });
+  }
+  const nearPrivate = (at) => {
+    let lo = 0,
+      hi = merged.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >>> 1,
+        a = merged[mid];
+      if (at < a.from) hi = mid - 1;
+      else if (at > a.to) lo = mid + 1;
+      else return true;
+    }
+    return false;
+  };
+  return {
+    ...data,
+    sessions: data.sessions.map((s) => ({
+      ...s,
+      frames: s.frames.map((f) => ({
+        ...f,
+        sharedPrivate: hidden(f, settings) || nearPrivate(f.at),
+      })),
+      activity: s.activity.map((a) => ({ ...a, sharedPrivate: hidden(a, settings) })),
+    })),
+  };
+}
+module.exports = { hidden, buildSnapshot, localPrivacy };
