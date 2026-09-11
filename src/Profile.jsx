@@ -42,6 +42,9 @@ export default function Profile({ data, busy, act, onBack }) {
       <div className="page-heading">
         <h1>Profil</h1>
       </div>
+      <button className="text-button" disabled={busy} onClick={() => act(() => api.shareBrowse())}>
+        <ExternalLink size={16} /> Consulter un profil sans compte
+      </button>
       <section className="profile-activity">
         <h2>{duration(days.reduce((n, d) => n + d.ms, 0))} de travail</h2>
         <div className="profile-calendar" aria-label="Activité des douze derniers mois">

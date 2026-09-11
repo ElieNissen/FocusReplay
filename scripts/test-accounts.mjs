@@ -53,6 +53,16 @@ try {
     .poll(() => page.evaluate(() => window.focusReplay.state().then((s) => s.share.enabled)))
     .toBe(true);
   expect((await fetch(origin + '/api/p/fictional-owner/snapshot')).status).toBe(401);
+  const openedViewer = app.waitForEvent('window');
+  await page.getByRole('button', { name: 'Consulter un profil sans compte' }).click();
+  const viewer = await openedViewer;
+  await viewer.getByLabel('Ouvrir un profil').fill('fictional-owner');
+  await viewer.getByRole('button', { name: 'Ouvrir le profil', exact: true }).click();
+  await viewer.getByLabel('Mot de passe du partage').fill('A separate viewer password');
+  await viewer.getByRole('button', { name: 'Accéder au replay' }).click();
+  await expect(viewer.getByText('Aucune session partagée pour le moment.')).toBeVisible();
+  expect(await viewer.evaluate(() => typeof window.focusReplay)).toBe('undefined');
+  await viewer.close();
   await page
     .getByRole('button', { name: 'Arrêter et retirer le replay en ligne', exact: true })
     .click();

@@ -6,6 +6,7 @@ const methods = [
   'shareConfigure',
   'shareEnable',
   'shareOpen',
+  'shareBrowse',
   'shareMask',
   'checkinState',
   'checkinRespond',

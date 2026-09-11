@@ -705,6 +705,11 @@ else {
       bind('shareOpen', () => {
         if (publisher.auth) shell.openExternal(publisher.state().url);
       });
+      bind('shareBrowse', () =>
+        require('./profile-viewer.cjs').openProfileViewer(
+          publisher.auth?.url || 'https://focusreplay-private.hushed-plume-0999.chatgpt.site',
+        ),
+      );
       bind('shareMask', async (id) => {
         await recorder.run(async () => {
           const frame = recorder.data.sessions.flatMap((s) => s.frames).find((f) => f.id === id);
