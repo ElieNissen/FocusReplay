@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 const methods = [
   'state',
+  'widgetExpand',
   'shareConnect',
   'shareLogin',
   'shareConfigure',

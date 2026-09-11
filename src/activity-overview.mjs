@@ -26,9 +26,11 @@ export function groupActivity(segments, start, end, width, gaps = []) {
         app: a.app,
         domain: a.domain || '',
         category: a.category,
+        sharedPrivate: false,
         ms: 0,
       };
       row.ms += overlap * Math.min(1, a.ms / Math.max(1, a.to - a.from));
+      row.sharedPrivate ||= Boolean(a.sharedPrivate);
       totals.set(key, row);
     }
     const apps = [...totals.values()].sort((a, b) => b.ms - a.ms);
@@ -46,6 +48,7 @@ export function groupActivity(segments, start, end, width, gaps = []) {
     ) {
       previous.to = to;
       previous.apps[0].ms += apps[0].ms;
+      previous.apps[0].sharedPrivate ||= apps[0].sharedPrivate;
     } else result.push({ from, to, apps });
   }
   return result;
@@ -85,4 +88,33 @@ export function sessionGaps(sessions, start, end, now = Date.now()) {
   }
   if (at < end) pauses.push({ from: at, to: end, label: 'Hors session' });
   return pauses.filter((a) => a.to > a.from).sort((a, b) => a.from - b.from);
+}
+
+export function sessionTime(sessions, start = 0, end = Date.now()) {
+  let elapsed = 0,
+    paused = 0;
+  for (const s of sessions) {
+    const from = Math.max(start, s.startedAt),
+      to = Math.min(end, s.endedAt || end);
+    if (to <= from) continue;
+    elapsed += to - from;
+    paused += sessionGaps([s], from, to, end).reduce((n, g) => n + g.to - g.from, 0);
+  }
+  return { active: Math.max(0, elapsed - paused), paused };
+}
+
+export function groupMarkers(entries, start, end, width, size = 150) {
+  const groups = [];
+  for (const e of [...entries]
+    .filter((e) => e.at >= start && e.at <= end)
+    .sort((a, b) => a.at - b.at)) {
+    const x = Math.max(
+      0,
+      Math.min(width - Math.min(size, width), ((e.at - start) / Math.max(1, end - start)) * width),
+    );
+    const previous = groups.at(-1);
+    if (previous && x < previous.x + size + 8) previous.entries.push(e);
+    else groups.push({ x, entries: [e] });
+  }
+  return groups;
 }

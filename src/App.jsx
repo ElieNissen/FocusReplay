@@ -3,8 +3,8 @@ import Profile from './Profile';
 import SettingsView from './SettingsView';
 import Timeline from './Timeline';
 import AppIcon from './AppIcon';
-import { sessionGaps } from './activity-overview.mjs';
-import { CheckinHistory } from './CheckinOverlay';
+import { sessionGaps, sessionTime } from './activity-overview.mjs';
+
 import {
   Play,
   Pause,
@@ -34,6 +34,7 @@ import {
   Eye,
   Clock3,
   ShieldCheck,
+  EyeOff,
   Film,
   Activity,
   RotateCcw,
@@ -137,6 +138,21 @@ export default function App() {
   const active = data?.sessions.find((s) => !s.endedAt);
   const paused = active && (active.status === 'paused' || data.systemPaused);
   const settings = data?.settings;
+  const wasPaused = useRef(false);
+  useEffect(() => {
+    if (wasPaused.current && active && !paused) {
+      setDay(dayKey(Date.now()));
+      setSelectedSession(active.id);
+      setCursor(null);
+      setFollow(true);
+      setPlaying(false);
+      setPauseMenu(false);
+    }
+    wasPaused.current = Boolean(paused);
+  }, [paused, active?.id]);
+  useEffect(() => {
+    if (widget) api?.widgetExpand?.(pauseMenu)?.catch(() => {});
+  }, [widget, pauseMenu]);
   useSoundDesign(settings);
   useEffect(() => {
     if (!settings) return;
@@ -183,7 +199,14 @@ export default function App() {
   const softwareSegments = useMemo(() => mergeSegments(segments), [segments]);
   const current = follow || cursor === null ? frames.at(-1) : frameAt(frames, cursor);
   const index = current ? frames.findIndex((f) => f.id === current.id) : -1;
-  const start = frames.length ? Math.min(frames[0].at, segments[0]?.from ?? frames[0].at) : 0;
+  const visibleSessions = sessions.filter((s) => !selectedSession || s.id === selectedSession);
+  const dayStart = new Date(day + 'T00:00:00').getTime();
+  const dayEnd = new Date(day + 'T23:59:59.999').getTime();
+  const totals = sessionTime(visibleSessions, dayStart, Math.min(clock, dayEnd));
+  const activeTime = active ? sessionTime([active], active.startedAt, clock).active : 0;
+  const start = visibleSessions.length
+    ? Math.max(dayStart, Math.min(...visibleSessions.map((s) => s.startedAt)))
+    : 0;
   const checkinEntries = sessions
     .filter((s) => !selectedSession || s.id === selectedSession)
     .flatMap((s) => s.events || [])
@@ -304,26 +327,82 @@ export default function App() {
         <p>{error || 'Ouverture de votre espace local…'}</p>
       </main>
     );
+  const resume = () =>
+    act(async () => {
+      if (active?.status === 'paused') await api.pause();
+      setDay(dayKey(Date.now()));
+      setSelectedSession(active?.id || null);
+      setCursor(null);
+      setFollow(true);
+      setPlaying(false);
+      setPauseMenu(false);
+    });
+  const takePause = (minutes) =>
+    act(async () => {
+      await api.pauseFor(minutes);
+      setPauseMenu(false);
+    });
   if (widget)
     return (
-      <div className="widget">
-        <div className="widget-drag">
-          <CircleDot size={18} />
-          <div>
-            <strong>FocusReplay</strong>
+      <div className="widget-shell">
+        <div className="widget">
+          <div className="widget-drag">
+            <CircleDot size={15} />
             <small>
-              {active
-                ? `${paused ? 'En pause' : 'Capture active'} · ${duration(clock - active.startedAt)}`
-                : 'Session terminée'}
+              {paused ? 'Pause' : 'Session'} · {duration(activeTime)}
             </small>
           </div>
+          <IconButton
+            icon={paused ? Play : Pause}
+            label={paused ? 'Reprendre' : 'Pause'}
+            disabled={busy || data.systemPaused}
+            onClick={() => (paused ? resume() : setPauseMenu((p) => !p))}
+          />
+          <IconButton
+            icon={Square}
+            label="Terminer la session"
+            disabled={busy}
+            onClick={() => act(() => api.stop())}
+          />
+          <IconButton icon={Maximize} label="Ouvrir FocusReplay" onClick={() => api.showMain()} />
         </div>
-        <IconButton
-          icon={paused ? Play : Pause}
-          label={paused ? 'Reprendre' : 'Pause'}
-          onClick={() => act(() => api.pause())}
-        />
-        <IconButton icon={Maximize} label="Ouvrir FocusReplay" onClick={() => api.showMain()} />
+        {pauseMenu && (
+          <div className="widget-pause" aria-label="Choisir une pause">
+            <div className="pause-presets">
+              {[2, 5, 10, 15, 60].map((m) => (
+                <button key={m} disabled={busy} onClick={() => takePause(m)}>
+                  {m === 60 ? '1 h' : m + ' min'}
+                </button>
+              ))}
+              <button disabled={busy} onClick={() => takePause(null)}>
+                Sans limite
+              </button>
+            </div>
+            <form
+              className="pause-custom"
+              onSubmit={(e) => {
+                e.preventDefault();
+                takePause(Number(pauseMinutes));
+              }}
+            >
+              <input
+                aria-label="Durée personnalisée de pause"
+                type="number"
+                min="1"
+                max="1440"
+                required
+                value={pauseMinutes}
+                onChange={(e) => setPauseMinutes(e.target.value)}
+              />
+              <span>min</span>
+              <button disabled={busy}>Pause</button>
+              <button type="button" onClick={() => setPauseMenu(false)}>
+                Annuler
+              </button>
+            </form>
+          </div>
+        )}
+        {error && <small role="alert">{error}</small>}
       </div>
     );
   const statusText = !active
@@ -344,21 +423,6 @@ export default function App() {
           </span>
           <strong>FocusReplay</strong>
         </div>
-        <button
-          className="start-button"
-          onClick={
-            active
-              ? () => {
-                  changeDay(dayKey(active.startedAt));
-                  chooseSession(active.id);
-                }
-              : begin
-          }
-          disabled={busy}
-        >
-          {active ? <Radio size={17} /> : <Play size={17} fill="currentColor" />}
-          {active ? 'Session en cours' : 'Commencer une session'}
-        </button>
         <label className="date-field">
           <Clock3 size={16} />
           <input
@@ -392,9 +456,8 @@ export default function App() {
                 {!s.endedAt && <span className={`record-dot ${paused ? 'is-paused' : ''}`} />}
               </div>
               <small>
-                {shortTime(s.startedAt)} ·{' '}
-                {s.endedAt ? duration(s.endedAt - s.startedAt) : 'En cours'} · {s.frames.length}{' '}
-                {s.frames.length === 1 ? 'image' : 'images'}
+                {shortTime(s.startedAt)} · {duration(sessionTime([s], s.startedAt, clock).active)}{' '}
+                hors pauses · {s.frames.length} {s.frames.length === 1 ? 'image' : 'images'}
               </small>
               {s.status === 'interrupted' && <small>Interrompue, captures récupérées</small>}
             </button>
@@ -440,12 +503,16 @@ export default function App() {
           </div>
         </footer>
       </aside>
-      <main className="main-content">
+      <main className={'main-content ' + (view === 'replay' ? 'replay-workspace' : '')}>
         <header className="session-bar">
           <div className="status">
             <span className={`record-dot ${!active || paused ? 'is-paused' : ''}`} />
             <span>{statusText}</span>
-            {active && <strong className="tabular">{duration(clock - active.startedAt)}</strong>}
+            {active && (
+              <strong className="tabular" title="Durée hors pauses">
+                {duration(activeTime)}
+              </strong>
+            )}
           </div>
           <div className="session-actions">
             {settings.cameraEnabled && (
@@ -465,11 +532,16 @@ export default function App() {
                 <Volume2 size={16} /> Couper la musique
               </button>
             )}
+            {!active && (
+              <button className="primary" disabled={busy} onClick={begin}>
+                <Play size={16} /> Commencer une session
+              </button>
+            )}
             {active && (
               <>
                 <button
                   disabled={busy || data.systemPaused}
-                  onClick={() => (paused ? act(() => api.pause()) : setPauseMenu((p) => !p))}
+                  onClick={() => (paused ? resume() : setPauseMenu((p) => !p))}
                 >
                   {paused ? <Play size={16} /> : <Pause size={16} />}{' '}
                   {paused ? 'Reprendre' : 'Pause'}
@@ -500,7 +572,7 @@ export default function App() {
                 />
               </div>
               <div className="pause-presets">
-                {[2, 5, 10, 15].map((minutes) => (
+                {[2, 5, 10, 15, 60].map((minutes) => (
                   <button
                     key={minutes}
                     onClick={() =>
@@ -510,7 +582,7 @@ export default function App() {
                       })
                     }
                   >
-                    {minutes} min
+                    {minutes === 60 ? '1 h' : minutes + ' min'}
                   </button>
                 ))}
                 <button
@@ -562,7 +634,13 @@ export default function App() {
             )}
           </div>
         )}
-        <BreakBanner wallet={data.wallet} pauseTimer={data.pauseTimer} clock={clock} act={act} />
+        <BreakBanner
+          wallet={data.wallet}
+          pauseTimer={data.pauseTimer}
+          clock={clock}
+          act={act}
+          onResume={resume}
+        />
         {musicStatus.error && view !== 'settings' && (
           <div className="notice" role="status">
             <Music2 size={17} />
@@ -673,6 +751,20 @@ export default function App() {
             ) : (
               <>
                 <section className="replay-stage" aria-label="Prévisualisation de la capture">
+                  <button
+                    className="preview-privacy-action"
+                    disabled={busy || current.private}
+                    onClick={() => act(() => api.shareMask(current.id))}
+                  >
+                    {current.sharedPrivate
+                      ? 'Masqué en ligne · original local'
+                      : 'Masquer cette capture dans le partage'}
+                  </button>
+                  {current.sharedPrivate && (
+                    <span className="privacy-badge">
+                      <EyeOff size={14} /> Masqué dans le partage en ligne
+                    </span>
+                  )}
                   <div className="image-scroll">
                     <div className="image-surface" style={{ width: '100%', height: '100%' }}>
                       {gaps.some((g) => playheadTime >= g.from && playheadTime < g.to) && (
@@ -761,14 +853,8 @@ export default function App() {
                     <output>{speed} img/s</output>
                   </label>
                 </div>
-                <button
-                  className="text-button"
-                  disabled={busy || current.private}
-                  onClick={() => act(() => api.shareMask(current.id))}
-                >
-                  {current.private ? 'Capture privée' : 'Masquer cette capture dans le partage'}
-                </button>
                 <Timeline
+                  totals={totals}
                   frames={frames}
                   segments={softwareSegments}
                   gaps={gaps}
@@ -801,8 +887,9 @@ export default function App() {
                 />
               </>
             )}
-            <CheckinHistory entries={checkinEntries} seek={seek} />
-            <section className="insights">
+
+            <details className="insights">
+              <summary>Logiciels & répartition · {duration(stats.total)} observées</summary>
               {stats.total ? (
                 <>
                   <div className="category-summary">
@@ -853,7 +940,7 @@ export default function App() {
                   </div>
                 </>
               ) : null}
-            </section>
+            </details>
             {frames.length > 0 && (
               <div className="archive-actions">
                 <div>

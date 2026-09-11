@@ -1,10 +1,11 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ZoomIn, ZoomOut, MessageCircle } from 'lucide-react';
+import { ZoomIn, ZoomOut, MessageCircle, EyeOff, X } from 'lucide-react';
 import { shortTime, duration } from './lib.mjs';
-import { groupActivity } from './activity-overview.mjs';
+import { groupActivity, groupMarkers } from './activity-overview.mjs';
 import AppIcon from './AppIcon';
 export default function Timeline({
   frames,
+  totals,
   checkins = [],
   segments,
   gaps = [],
@@ -27,6 +28,7 @@ export default function Timeline({
     [shownZoom, setShownZoom] = useState(zoom);
   const [group, setGroup] = useState(null),
     [editing, setEditing] = useState(null);
+  const [markerSelection, setMarkerSelection] = useState(null);
   const span = Math.max(1, end - start),
     base = Math.min(viewport, Math.max(280, frames.length * 96));
   const width = base * shownZoom;
@@ -70,10 +72,14 @@ export default function Timeline({
     if (anchor.current) scroll.current.scrollLeft = anchor.current.ratio * width - anchor.current.x;
   }, [width]);
   useEffect(() => {
+    if (Math.abs(cursor - end) < 1000) scroll.current.scrollLeft = width;
+  }, [cursor, end, width]);
+  useEffect(() => {
     const close = (e) => {
       if (e.key === 'Escape') {
         setEditing(null);
         setGroup(null);
+        setMarkerSelection(null);
       }
     };
     window.addEventListener('keydown', close);
@@ -93,12 +99,34 @@ export default function Timeline({
     2 ** Math.ceil(Math.log2(Math.max(1, frames.length / Math.max(1, (base * zoom) / 100)))),
   );
   const samples = frames.filter((_, i) => i % stride === 0);
+  const markers = groupMarkers(checkins, start, end, base * zoom);
   const position = (from, to) => ({
     left: ((from - start) / span) * width,
     width: Math.max(0, ((to - from) / span) * width),
   });
   return (
     <section className="timeline-section overview-timeline" aria-label="Timeline interactive">
+      {markerSelection && (
+        <div
+          className="marker-detail overview-detail"
+          role="region"
+          aria-label="Repères sélectionnés"
+        >
+          <button
+            className="icon-button"
+            aria-label="Fermer les repères"
+            onClick={() => setMarkerSelection(null)}
+          >
+            <X size={16} />
+          </button>
+          {markerSelection.map((e) => (
+            <button key={e.id} onClick={() => seek(e.at)}>
+              <time>{shortTime(e.at)}</time>
+              <span>{e.text || 'Arrêt du travail'}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {editing && (
         <div
           className="timeline-rule overview-detail"
@@ -157,6 +185,10 @@ export default function Timeline({
         </div>
       )}
       <div className="timeline-toolbar">
+        <div className="time-totals">
+          <strong>{duration(totals?.active || 0)} hors pauses</strong>
+          <span>Pauses · {duration(totals?.paused || 0)}</span>
+        </div>
         <div className="inline-slider zoom-control">
           <button
             aria-label="Dézoomer la timeline"
@@ -183,7 +215,7 @@ export default function Timeline({
         ref={scroll}
         title="Molette : zoom · Maj + molette : défilement · Q/D ou flèches : image précédente/suivante"
       >
-        <div className="timeline-inner" style={{ width, height: 190 }}>
+        <div className="timeline-inner" style={{ width, height: checkins.length ? 224 : 184 }}>
           <div className="ruler">
             {Array.from({ length: 9 }, (_, i) => (
               <span key={i}>{shortTime(start + (span * i) / 8)}</span>
@@ -209,6 +241,22 @@ export default function Timeline({
                 <span>{g.label}</span>
               </div>
             ))}
+            {groupMarkers(
+              frames.filter((f) => f.sharedPrivate),
+              start,
+              end,
+              base * zoom,
+              28,
+            ).map((m) => (
+              <span
+                key={'private-' + m.entries[0].id}
+                className="timeline-private"
+                title={m.entries.length + ' capture(s) masquée(s) dans le partage en ligne'}
+                style={{ left: (m.x * shownZoom) / zoom }}
+              >
+                <EyeOff size={13} />
+              </span>
+            ))}
           </div>
           <div className="activity-track" aria-hidden="true">
             {segments.map((a, i) => (
@@ -228,7 +276,11 @@ export default function Timeline({
                   key={g.from}
                   className={'overview-block ' + a.category}
                   style={position(g.from, g.to)}
-                  aria-label={(a.domain || a.app) + ' · ' + duration(a.ms)}
+                  aria-label={
+                    g.apps.map((r) => r.domain || r.app).join(', ') +
+                    ' · ' +
+                    duration(g.apps.reduce((n, r) => n + r.ms, 0))
+                  }
                   title={
                     shortTime(g.from) +
                     '–' +
@@ -240,15 +292,33 @@ export default function Timeline({
                     seek(g.from);
                     setGroup(g);
                     setEditing(a);
+                    setMarkerSelection(null);
                   }}
                 >
-                  {px > 35 && <AppIcon name={a.app} icons={icons} />}
+                  {px > 35 && (
+                    <div className="group-icons">
+                      {g.apps.slice(0, px > 160 ? 3 : 1).map((r, i) => (
+                        <AppIcon key={i} name={r.app} icons={icons} />
+                      ))}
+                    </div>
+                  )}
+                  {g.apps.some((r) => r.sharedPrivate) && px > 65 && (
+                    <EyeOff size={12} aria-label="Contient des éléments masqués en ligne" />
+                  )}
                   {px > 90 && (
                     <span>
-                      <strong>{a.domain || a.app}</strong>
+                      <strong>
+                        {g.apps.length > 1
+                          ? g.apps
+                              .slice(0, 2)
+                              .map((r) => r.domain || r.app)
+                              .join(' + ')
+                          : a.domain || a.app}
+                      </strong>
                       <small>
-                        {duration(a.ms)}
-                        {g.apps.length > 1 && ' · +' + (g.apps.length - 1)}
+                        {g.apps.length > 1
+                          ? g.apps.length + ' activités · détails'
+                          : duration(a.ms)}
                       </small>
                     </span>
                   )}
@@ -259,26 +329,34 @@ export default function Timeline({
               <div key={i} className="overview-gap" style={position(g.from, g.to)} />
             ))}
           </div>
-          {checkins
-            .filter((e) => e.at >= start && e.at <= end)
-            .map((e) => (
+          {markers.map((m) => {
+            const e = m.entries[0];
+            return (
               <button
                 key={e.id}
-                className="checkin-marker"
+                className="timeline-note"
                 style={{
-                  left: Math.max(11, Math.min(width - 11, ((e.at - start) / span) * width)),
+                  left: (m.x * shownZoom) / zoom,
                 }}
-                title={e.text || 'Arrêt du travail'}
+                title={m.entries
+                  .map((e) => shortTime(e.at) + ' · ' + (e.text || 'Arrêt du travail'))
+                  .join('\n')}
                 aria-label={'Repère à ' + shortTime(e.at)}
                 onClick={() => {
                   seek(e.at);
-                  const h = document.querySelector('.checkin-history');
-                  if (h) h.open = true;
+                  setEditing(null);
+                  setMarkerSelection(m.entries);
                 }}
               >
                 <MessageCircle size={13} />
+                <span>
+                  {m.entries.length > 1
+                    ? m.entries.length + ' repères'
+                    : e.text || 'Arrêt du travail'}
+                </span>
               </button>
-            ))}
+            );
+          })}
           <div className="playhead" style={{ left: ((cursor - start) / span) * width }}>
             <span />
           </div>

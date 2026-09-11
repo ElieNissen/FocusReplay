@@ -1,5 +1,30 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+test('active session duration excludes overlapping manual and system pauses and clips days', async () => {
+  const { sessionTime, groupMarkers } = await import('../src/activity-overview.mjs');
+  const s = {
+    startedAt: 100,
+    endedAt: 900,
+    events: [
+      { at: 200, type: 'pause' },
+      { at: 250, type: 'system-pause' },
+      { at: 300, type: 'resume' },
+      { at: 400, type: 'system-resume' },
+    ],
+  };
+  assert.deepEqual(sessionTime([s], 0, 1000), { active: 600, paused: 200 });
+  assert.deepEqual(sessionTime([s], 275, 500), { active: 100, paused: 125 });
+  assert.deepEqual(
+    sessionTime([{ ...s, endedAt: null, events: [{ at: 200, type: 'pause' }] }], 0, 800),
+    { active: 100, paused: 600 },
+  );
+  const entries = [100, 101, 102, 500, 999].map((at, i) => ({ at, id: String(i) }));
+  for (const width of [300, 900, 7200]) {
+    const groups = groupMarkers(entries, 0, 1000, width);
+    assert.equal(groups.flatMap((g) => g.entries).length, 5);
+    assert.ok(groups.every((g, i) => !i || g.x >= groups[i - 1].x + 158));
+  }
+});
 test('day overview groups rapid switches without losing time or changing proportional boundaries', async () => {
   const { groupActivity } = await import('../src/activity-overview.mjs');
   const segments = Array.from({ length: 14400 }, (_, i) => ({

@@ -466,9 +466,9 @@ try {
       ),
     )
     .toBe('Fatigue');
-  await page.locator('.checkin-history summary').click();
+  await page.locator('.timeline-note').last().click();
   await expect(
-    page.locator('.checkin-history').getByText('Fatigue', { exact: true }),
+    page.locator('.marker-detail').getByText('Fatigue', { exact: true }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Terminer', exact: true }).click();
   await expect(page.getByText('Caméra autorisée', { exact: true })).toBeVisible();

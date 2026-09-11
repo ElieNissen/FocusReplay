@@ -163,6 +163,20 @@ function showMain() {
   main.show();
   main.focus();
 }
+let titleBarTheme;
+function updateTitleBar() {
+  if (!main || main.isDestroyed()) return;
+  const theme = recorder?.data.settings.theme;
+  const dark = theme === 'dark' || (theme === 'system' && nativeTheme.shouldUseDarkColors);
+  if (titleBarTheme === dark) return;
+  titleBarTheme = dark;
+  main.setTitleBarOverlay({
+    color: dark ? '#191b1e' : '#f8f6f2',
+    symbolColor: dark ? '#e5e5e5' : '#292e36',
+    height: 48,
+  });
+}
+nativeTheme.on('updated', updateTitleBar);
 function createMain() {
   main = new BrowserWindow({
     width: 1440,
@@ -173,6 +187,8 @@ function createMain() {
     title: 'FocusReplay',
     icon: icon(),
     autoHideMenuBar: true,
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#191b1e', symbolColor: '#e5e5e5', height: 48 },
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -183,6 +199,8 @@ function createMain() {
     },
   });
   secureWindow(main);
+  titleBarTheme = undefined;
+  updateTitleBar();
   if (devUrl) main.loadURL(devUrl);
   else main.loadFile(path.join(__dirname, '../dist/index.html'));
   main.once('ready-to-show', () => main.show());
@@ -269,9 +287,9 @@ function updateWidget() {
   if (widget && !widget.isDestroyed()) return;
   const bounds = screen.getPrimaryDisplay().workArea;
   widget = new BrowserWindow({
-    width: 380,
-    height: 74,
-    x: bounds.x + bounds.width - 400,
+    width: 300,
+    height: 54,
+    x: bounds.x + bounds.width - 320,
     y: bounds.y + 20,
     frame: false,
     resizable: false,
@@ -625,6 +643,7 @@ else {
       tray.on('double-click', showMain);
       updateTray();
       recorder.on('change', (state) => {
+        updateTitleBar();
         checkins.sync();
         musicDirector.observe(recorder.active, recorder.systemPaused);
         musicDirector.changed();
@@ -646,7 +665,10 @@ else {
             recorder.data.settings.browserHints,
             recorder.data.settings.browserDomains,
           );
-        send('focus:change', { ...state, share: publisher.state() });
+        send('focus:change', {
+          ...require('./share-snapshot.cjs').localPrivacy(state),
+          share: publisher.state(),
+        });
         updateTray();
         updateWidget();
       });
@@ -662,7 +684,7 @@ else {
         send('focus:break-ended', { name: reward.name });
       });
       bind('state', () => ({
-        ...recorder.snapshot(),
+        ...require('./share-snapshot.cjs').localPrivacy(recorder.snapshot()),
         share: publisher.state(),
         exportState,
         version: app.getVersion(),
@@ -773,6 +795,20 @@ else {
         })),
       );
       bind('start', startSession);
+      bind('widgetExpand', (expanded) => {
+        if (typeof expanded !== 'boolean') throw Error('État invalide.');
+        if (widget && !widget.isDestroyed()) {
+          const [x, y] = widget.getPosition();
+          const area = screen.getDisplayMatching(widget.getBounds()).workArea;
+          const height = expanded ? 186 : 54;
+          widget.setBounds({
+            x: Math.max(area.x, Math.min(x, area.x + area.width - 300)),
+            y: Math.max(area.y, Math.min(y, area.y + area.height - height)),
+            width: 300,
+            height,
+          });
+        }
+      });
       bind('pause', () => {
         stopCamera();
         return recorder.pause();

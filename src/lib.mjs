@@ -63,6 +63,7 @@ export function mergeSegments(segments) {
       previous.app === a.app &&
       (previous.domain || '') === (a.domain || '') &&
       previous.category === a.category &&
+      Boolean(previous.sharedPrivate) === Boolean(a.sharedPrivate) &&
       a.from - previous.to < 5000
     ) {
       previous.to = a.to;

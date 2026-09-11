@@ -4,7 +4,7 @@ import { duration } from './lib.mjs';
 import { Toggle } from './Toggle';
 
 const blank = { name: '', minutes: 5, cost: 25 };
-export function BreakBanner({ wallet, pauseTimer, clock, act }) {
+export function BreakBanner({ wallet, pauseTimer, clock, act, onResume }) {
   const reward = pauseTimer || wallet?.activeBreak;
   if (!reward) return null;
   const remaining = reward.notified ? 0 : Math.max(0, reward.endsAt - clock);
@@ -23,7 +23,11 @@ export function BreakBanner({ wallet, pauseTimer, clock, act }) {
       </span>
       <button
         onClick={() =>
-          act(() => (pauseTimer ? window.focusReplay.pause() : window.focusReplay.finishBreak()))
+          onResume
+            ? onResume()
+            : act(() =>
+                pauseTimer ? window.focusReplay.pause() : window.focusReplay.finishBreak(),
+              )
         }
       >
         {pauseTimer ? 'Reprendre maintenant' : remaining ? 'Terminer la pause' : 'J’ai terminé'}
