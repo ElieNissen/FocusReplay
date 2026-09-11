@@ -435,13 +435,12 @@ try {
     )
     .toBe('Préparer une maquette');
   overlay = await openPrompt();
-  await expect(overlay.getByRole('textbox', { name: 'Votre réponse' })).toHaveCount(0);
+  await expect(overlay.getByRole('textbox', { name: 'Votre réponse' })).toBeVisible();
   await overlay.screenshot({ path: path.join(root, 'checkin-repeat.png') });
   const repeatedClosed = overlay.waitForEvent('close');
   await overlay.getByRole('button', { name: 'Toujours sur « Préparer une maquette »' }).click();
   await repeatedClosed;
   overlay = await openPrompt();
-  await overlay.getByRole('button', { name: 'Je travaille sur autre chose' }).click();
   await expect(overlay.getByRole('textbox', { name: 'Votre réponse' })).toBeVisible();
   const reasonWindow = app.waitForEvent('window');
   await overlay.getByRole('button', { name: 'J’ai arrêté de travailler', exact: true }).click();

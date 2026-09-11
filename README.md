@@ -149,6 +149,6 @@ The connection flow is **Profil → Créer mon compte / Se connecter**. Version 
 
 The website root is a shared account entry point, never a default personal profile. Profile URLs remain separate and private. Email addresses are stored as unverified identifiers: email delivery, verification and password recovery are not configured yet. Do not present an email address as proof of ownership or grant access to someone merely claiming it. Browser sessions last 24 hours, are HttpOnly and can be revoked by logging out; they never expose desktop publishing keys. Registration is rate limited and capped at 100 accounts by default during this early beta.
 
-The check-in overlay offers **Toujours sur « … »** after the first work answer in a session. Choosing **Je travaille sur autre chose** reveals the text field.
+The check-in overlay offers **Toujours sur « … »** after the first work answer in a session, alongside the always-visible text field and **J’ai arrêté de travailler** action.
 
 Deploy your own server from this repository using [the standalone guide](web/SELF_HOSTING.md). The [social roadmap](docs/SOCIAL_ROADMAP.md) separates accounts, friends and screenshot grants.
