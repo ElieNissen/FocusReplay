@@ -2,7 +2,7 @@
 
 ## Premier essai avec votre vraie journée
 
-1. Ouvrez `FocusReplay-0.2.0-Windows.exe`. Aucune installation ni connexion n’est nécessaire. Cette première version n’est pas signée : Windows peut afficher un avertissement sur l’éditeur.
+1. Utilisez l'installateur `FocusReplay-VERSION-Setup.exe`, puis ouvrez FocusReplay depuis le menu Démarrer. Aucune connexion n'est nécessaire pour enregistrer. Les builds d'essai portant la mention `NonSigne` peuvent être entièrement bloqués par Smart App Control, pas seulement afficher un avertissement. Aucune version signée n'est encore disponible. Quittez l'ancienne application depuis son icône de notification avant une mise à jour ; vos données restent dans le même dossier local.
 2. Cliquez sur **Commencer une session**. L’application capture réellement l’écran sélectionné et relève le logiciel au premier plan. Aucun objectif ou commentaire à remplir.
 3. Pour un premier essai rapide, choisissez **10 secondes** entre les captures dans **Réglages**. Vous pourrez ensuite revenir à **1 minute**, le réglage par défaut.
 4. Passez quelques instants dans deux logiciels, puis revenez dans FocusReplay. Glissez le curseur de la timeline : l’image change immédiatement. La piste des logiciels et le récapitulatif montrent les durées observées.
