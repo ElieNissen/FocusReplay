@@ -10,6 +10,10 @@ The old portable NSIS launcher deletes and extracts its payload into a temporary
 
 `npm run dist` requires code signing and must fail if a usable signing identity is unavailable. The former `win.signExecutable: false` override is removed. DLLs and the packaged PowerShell tracker are included in signing via `win.signExts`. A self-signed certificate is not a substitute for a publicly trusted code-signing identity.
 
+The release command also runs `npm run verify:release`: Windows validates Authenticode trust on the installer and every packaged EXE, DLL and PowerShell script. FocusReplay executables must have timestamped signatures. Missing artifacts, unsigned files, invalid signatures or a failed verification tool stop the release. The unsigned installer construction and the verifier's rejection of it have been tested; installation with a trusted signature and Smart App Control acceptance remain pending.
+
+For a possible free open-source route, see [the pending SignPath policy](CODE_SIGNING_POLICY.md). Foundation approval is not guaranteed, particularly for an early-stage project. Microsoft's individual developer route currently requires US or Canadian eligibility; do not assume an individual in Europe can enroll. Verify current provider eligibility before creating a paid service or collecting identity documents.
+
 Use a trusted RSA code-signing certificate or Microsoft's managed Artifact/Trusted Signing service. The publisher must complete the provider's identity verification and approve any charges. Do not commit certificates, private keys, passwords, tenant credentials or production signing configuration. For certificate-based signing, electron-builder supports `CSC_LINK` and `CSC_KEY_PASSWORD` in the build environment. For Microsoft managed signing, use a private electron-builder configuration with `win.azureSignOptions` and provider authentication; never invent the publisher identity.
 
 Primary references: [Microsoft Smart App Control signing](https://learn.microsoft.com/en-us/windows/apps/develop/smart-app-control/code-signing-for-smart-app-control), [electron-builder signing](https://www.electron.build/code-signing-win.html).

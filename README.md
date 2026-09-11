@@ -43,6 +43,8 @@ For music and capture options, open **Réglages**. Reducing retention or the cap
 
 ## Build a signed Windows installer
 
+[Code signing policy](docs/CODE_SIGNING_POLICY.md) · [Data handling](docs/PRIVACY.md)
+
 ```powershell
 npm run dist
 ```
