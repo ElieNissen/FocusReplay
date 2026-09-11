@@ -22,6 +22,13 @@ function client(fetcher) {
   s.auth = { ...auth };
   return s;
 }
+test('Spotify accepts non-JSON playback acknowledgements and sanitizes malformed reads', async () => {
+  const s = client(async () => new Response('HKO-example-acknowledgement', { status: 200 }));
+  assert.equal(await s.request('/me/player/play', 'PUT', { uris: [track] }), null);
+  assert.equal(await s.request('/me/player/pause', 'PUT'), null);
+  await assert.rejects(s.request('/me/player'), /Réponse Spotify illisible/);
+  await assert.rejects(s.token({}), /Réponse de connexion Spotify illisible/);
+});
 test('music links accept only Spotify content; selections shuffle once without duplicates', () => {
   assert.equal(
     spotifyUri('https://open.spotify.com/intl-fr/track/' + 'a'.repeat(22) + '?si=example', 'track'),

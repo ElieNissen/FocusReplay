@@ -68,7 +68,9 @@ class Spotify {
       redirect: 'error',
     });
     if (!response.ok) throw new Error('Connexion Spotify expirée ou refusée. Reconnectez Spotify.');
-    const value = await response.json();
+    const value = await response.json().catch(() => {
+      throw new Error('Réponse de connexion Spotify illisible. Réessayez la connexion.');
+    });
     if (!value.access_token || !Number.isFinite(value.expires_in))
       throw new Error('Réponse Spotify invalide.');
     return { ...value, expiresAt: Date.now() + value.expires_in * 1000 };
@@ -216,7 +218,11 @@ class Spotify {
       throw new Error('Spotify demande une pause. Réessayez dans quelques minutes.');
     if (!response.ok)
       throw new Error('Spotify est indisponible. Réessayez après avoir vérifié la connexion.');
-    return response.status === 204 ? null : response.json();
+    // Playback commands acknowledge success without a JSON payload (including some 200s).
+    if (response.status === 204 || method !== 'GET') return null;
+    return response.json().catch(() => {
+      throw new Error('Réponse Spotify illisible. Réessayez dans quelques instants.');
+    });
   }
   async search(query, offset = 0) {
     if (
