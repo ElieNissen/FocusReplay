@@ -75,11 +75,45 @@ async function limitedBody(request: Request, limit: number) {
   }
   return result;
 }
+function sessionToken(request: Request) {
+  return (
+    request.headers
+      .get('cookie')
+      ?.split(';')
+      .map((v) => v.trim())
+      .find((v) => v.startsWith('focus_account='))
+      ?.slice(14) || ''
+  );
+}
+async function browserAccount(request: Request, e: any) {
+  const token = sessionToken(request);
+  if (!/^[a-f0-9-]{36}$/.test(token)) return null;
+  const session = await get(e.DB, 'owner-session/' + (await digest(token)));
+  return session?.expires > Date.now() ? session.profile : null;
+}
 async function accountRoute(request: Request, e: any) {
   const url = new URL(request.url),
     db = e.DB;
-  if (request.method !== 'POST') return json({ error: 'Méthode refusée.' }, 405);
   if (!db || !e.PUBLISHER_KEY) return json({ error: 'Service indisponible.' }, 503);
+  if (url.pathname === '/api/account/options' && request.method === 'GET')
+    return json({ invitationRequired: e.OPEN_REGISTRATION !== 'true' });
+  if (url.pathname === '/api/account/me' && request.method === 'GET') {
+    const profile = await browserAccount(request, e);
+    return profile ? json({ profile }) : json({ error: 'Connexion requise.' }, 401);
+  }
+  if (request.method !== 'POST') return json({ error: 'Méthode refusée.' }, 405);
+  const origin = request.headers.get('origin');
+  if (origin && origin !== url.origin) return json({ error: 'Accès refusé.' }, 403);
+  if (url.pathname === '/api/account/logout') {
+    if (origin !== url.origin) return json({ error: 'Accès refusé.' }, 403);
+    if (sessionToken(request))
+      await put(db, 'owner-session/' + (await digest(sessionToken(request))), null);
+    return json({ ok: true }, 200, {
+      'Set-Cookie': 'focus_account=; HttpOnly; Secure; SameSite=Strict; Path=/api; Max-Age=0',
+    });
+  }
+  if (!['/api/account/register', '/api/account/login'].includes(url.pathname))
+    return json({ error: 'Introuvable.' }, 404);
   const now = Date.now(),
     attemptKey =
       'account:' +
@@ -95,39 +129,120 @@ async function accountRoute(request: Request, e: any) {
   await db.prepare('DELETE FROM attempts WHERE expires < ?').bind(now).run();
   if (attempt.count > 8)
     return json({ error: 'Trop de tentatives. Réessayez dans une minute.' }, 429);
-  const body = JSON.parse(new TextDecoder().decode(await limitedBody(request, 2048)));
+  let body: any;
+  try {
+    body = JSON.parse(new TextDecoder().decode(await limitedBody(request, 2048)));
+  } catch {
+    return json({ error: 'Formulaire invalide.' }, 400);
+  }
+  if (!body || typeof body !== 'object') return json({ error: 'Formulaire invalide.' }, 400);
+  if (body.browser && origin !== url.origin) return json({ error: 'Accès refusé.' }, 403);
+  const registering = url.pathname === '/api/account/register';
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  let id = typeof body.profile === 'string' ? body.profile.trim().toLowerCase() : '';
+  if (!registering && email) {
+    const row = await db
+      .prepare(
+        "SELECT id FROM state WHERE id LIKE '%/account' AND json_extract(value, '$.email') = ? LIMIT 1",
+      )
+      .bind(email)
+      .first();
+    id = row?.id?.slice(0, -8) || '';
+  }
   if (
-    typeof body.profile !== 'string' ||
-    !/^[a-z0-9][a-z0-9-]{2,39}$/.test(body.profile || '') ||
+    !/^[a-z0-9][a-z0-9-]{2,39}$/.test(id) ||
     typeof body.password !== 'string' ||
     body.password.length < 12 ||
     body.password.length > 128
   )
     return json(
-      { error: 'Identifiant de 3 à 40 caractères et mot de passe de 12 caractères minimum.' },
-      400,
+      {
+        error: registering
+          ? 'Pseudo de 3 à 40 caractères et mot de passe de 12 caractères minimum.'
+          : 'E-mail, identifiant ou mot de passe incorrect.',
+      },
+      registering ? 400 : 401,
     );
-  const id = body.profile,
-    accountId = id + '/account',
+  const accountId = id + '/account',
     account = await get(db, accountId),
     key = await sign('publisher:' + id, e.PUBLISHER_KEY);
-  if (url.pathname === '/api/account/register') {
+  if (registering) {
+    if (e.OPEN_REGISTRATION === 'true') {
+      const registrationKey =
+        'register:' +
+        (await digest(
+          (request.headers.get('cf-connecting-ip') || 'local') + Math.floor(now / 3600000),
+        ));
+      const registrationAttempt = await db
+        .prepare(
+          'INSERT INTO attempts(id,count,expires) VALUES (?,1,?) ON CONFLICT(id) DO UPDATE SET count=count+1 RETURNING count',
+        )
+        .bind(registrationKey, now + 7200000)
+        .first();
+      if (registrationAttempt.count > 3)
+        return json(
+          {
+            error: 'Trop de créations de compte depuis cette connexion. Réessayez dans une heure.',
+          },
+          429,
+        );
+    }
+    if (
+      (email || e.OPEN_REGISTRATION === 'true') &&
+      (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    )
+      return json({ error: 'Saisissez une adresse e-mail valide.' }, 400);
     const invitation =
       e.REGISTRATION_CODE || (await sign('registration', e.PUBLISHER_KEY)).slice(0, 24);
-    if (body.invitation !== invitation) return json({ error: 'Invitation invalide.' }, 403);
+    if (e.OPEN_REGISTRATION !== 'true' && body.invitation !== invitation)
+      return json(
+        { error: 'Ce serveur est sur invitation. Demandez un code à son administrateur.' },
+        403,
+      );
     if (account || (await get(db, id + '/config')))
       return json({ error: 'Cet identifiant est déjà utilisé.' }, 409);
     const salt = crypto.randomUUID(),
-      value = JSON.stringify({ salt, hash: await hash(body.password, salt), createdAt: now });
+      value = JSON.stringify({
+        salt,
+        hash: await hash(body.password, salt),
+        createdAt: now,
+        ...(email ? { email, emailVerified: false } : {}),
+      });
+    const limit = Math.max(1, Math.min(10000, Number(e.MAX_ACCOUNTS) || 100));
     const inserted = await db
-      .prepare('INSERT INTO state(id,value) VALUES (?,?) ON CONFLICT(id) DO NOTHING RETURNING id')
-      .bind(accountId, value)
+      .prepare(
+        "INSERT INTO state(id,value) SELECT ?,? WHERE (SELECT COUNT(*) FROM state WHERE id LIKE '%/account') < ? AND (? = '' OR NOT EXISTS (SELECT 1 FROM state WHERE id LIKE '%/account' AND json_extract(value, '$.email') = ?)) ON CONFLICT(id) DO NOTHING RETURNING id",
+      )
+      .bind(accountId, value, limit, email, email)
       .first();
-    if (!inserted) return json({ error: 'Cet identifiant est déjà utilisé.' }, 409);
+    if (!inserted)
+      return json(
+        {
+          error:
+            'Création impossible : compte déjà existant ou inscriptions temporairement complètes. Essayez de vous connecter.',
+        },
+        409,
+      );
   } else if (url.pathname === '/api/account/login') {
     if (!account || (await hash(body.password, account.salt)) !== account.hash)
       return json({ error: 'Identifiant ou mot de passe incorrect.' }, 401);
   } else return json({ error: 'Introuvable.' }, 404);
+  if (body.browser) {
+    const token = crypto.randomUUID();
+    await db
+      .prepare(
+        "DELETE FROM state WHERE id LIKE 'owner-session/%' AND (value = 'null' OR json_extract(value, '$.expires') < ?)",
+      )
+      .bind(now)
+      .run();
+    await put(db, 'owner-session/' + (await digest(token)), {
+      profile: id,
+      expires: now + 86400000,
+    });
+    return json({ profile: id }, 200, {
+      'Set-Cookie': `focus_account=${token}; HttpOnly; Secure; SameSite=Strict; Path=/api; Max-Age=86400`,
+    });
+  }
   return json({ profile: id, key, configured: Boolean(await get(db, id + '/config')) });
 }
 export async function route(request: Request, e: any) {
@@ -265,12 +380,14 @@ export async function route(request: Request, e: any) {
       .find((v) => v.startsWith(cookieName + '='))
       ?.slice(cookieName.length + 1) || '';
   const [expires, revision, signature] = cookie.split('.');
+  const ownRead = request.method === 'GET' && (await browserAccount(request, e)) === profile;
   if (
-    !config ||
-    revision !== config.revision ||
-    Number(expires) < Date.now() ||
-    !signature ||
-    signature !== (await sign(expires + '.' + revision, profileKey))
+    !ownRead &&
+    (!config ||
+      revision !== config.revision ||
+      Number(expires) < Date.now() ||
+      !signature ||
+      signature !== (await sign(expires + '.' + revision, profileKey)))
   )
     return json({ error: 'Mot de passe requis.' }, 401);
   const snapshot = await stateGet('snapshot');

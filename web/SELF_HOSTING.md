@@ -26,6 +26,8 @@ Account credentials control publishing. A viewer password cannot sign in to an o
 
 ## Local verification without Docker
 
+To offer normal signup without invitation codes, set `OPEN_REGISTRATION=true` and optionally `MAX_ACCOUNTS=100` in the application environment (for Docker, add these under `app.environment` in Compose). The UI detects this mode on the website. Desktop users expand **Serveur personnalisé** for an independent instance. Signup requires an email, a public handle and a password; existing handle-only accounts still work. Email verification/delivery and password recovery are not implemented. Keep this an early beta until those account-management features are operational. The rate limits and account cap bound initial exposure; they do not replace ongoing abuse monitoring.
+
 Node 24.14 or newer is required; no external database or cloud account is needed:
 
 ```sh

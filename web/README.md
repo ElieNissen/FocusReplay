@@ -1,6 +1,6 @@
 # FocusReplay web
 
-For a deployment independent of Codex and chatgpt.site, start with [SELF_HOSTING.md](SELF_HOSTING.md). Account registration/login now happens inside the desktop interface; the connection-file flow below is legacy operator compatibility only.
+The shared website has a common account homepage and separate private profile URLs. Users can register and sign in on the website or desktop. The desktop automatically selects the shared service. For an optional deployment independent of Codex and chatgpt.site, start with [SELF_HOSTING.md](SELF_HOSTING.md). The connection-file flow below is legacy operator compatibility only.
 
 # FocusReplay private profiles
 
@@ -15,7 +15,7 @@ Node 24 is used for tests. Run `npm ci`, `npm run dev`, `npx tsc --noEmit`, `nod
 - `PUBLISHER_KEY` is a random 256-bit **server secret**, never distributed to desktop users. Each desktop receives only `HMAC-SHA256(PUBLISHER_KEY, "publisher:" + profileId)`, plus the site's HTTPS origin and its own profile ID. All database keys and object paths are scoped by profile ID.
 - The URL uses `/?profile=PROFILE_ID`. Profile IDs are public identifiers, not credentials. The owner's desktop sets a separate viewer password for that profile. Viewers receive an HttpOnly, Secure, SameSite cookie scoped to that profile after password verification. Passwords use salted PBKDF2-SHA256. Changing a password invalidates existing viewer cookies.
 - Knowing a profile ID, capture ID or URL does not authorize reading data. Every image request verifies both the profile cookie and current manifest; removing/masking an image revokes its original URL. Owner uploads require that image to appear in that profile's current manifest.
-- New accounts register through the desktop UI with an instance invitation code. No unrestricted sign-up is enabled. New friends are provisioned by the server operator, with their own derived publishing key. Do not distribute the root server key or reuse another user's connection file. The provisioning script reads the root from an environment variable and writes a connection file to ignored `outputs/`.
+- Set `OPEN_REGISTRATION=true` to allow email/handle/password signup without invitations. The shared service uses this mode. Independent instances keep invitation mode unless explicitly enabled. `MAX_ACCOUNTS` defaults to 100 (bounded to 10,000), with 8 authentication attempts per minute and 3 registration attempts per hour per IP. Atomic insertion prevents duplicate email accounts and exceeding the account cap. Email is normalized and stored unverified; there is no email delivery or recovery flow yet. Browser account cookies authorize only the owner's private reads, never other profiles or publishing writes. Desktop login receives the existing per-profile key, stored outside renderer state.
 - A connection file can overwrite its profile's replay and change its viewer password. Treat it as private; never put it on GitHub or give it to viewers.
 
 ## Storage and bandwidth

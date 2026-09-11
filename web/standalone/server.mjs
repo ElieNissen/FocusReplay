@@ -9,7 +9,12 @@ const port = Number(process.env.PORT || 8787),
 if (origin.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname))
   throw Error('PUBLIC_ORIGIN requires HTTPS outside localhost');
 const store = await storage(path.resolve(process.env.DATA_DIR || 'data'));
-const environment = { ...store, REGISTRATION_CODE: store.invitation };
+const environment = {
+  ...store,
+  REGISTRATION_CODE: store.invitation,
+  OPEN_REGISTRATION: process.env.OPEN_REGISTRATION,
+  MAX_ACCOUNTS: process.env.MAX_ACCOUNTS,
+};
 const mime = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript',
