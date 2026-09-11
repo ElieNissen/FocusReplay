@@ -2000,3 +2000,19 @@ strong {
   color: var(--muted);
   line-height: 1.6;
 }
+.checkin-repeat-choice {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+}
+.checkin-repeat-choice .repeat-work {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.checkin-repeat-choice .repeat-work svg {
+  flex-shrink: 0;
+}

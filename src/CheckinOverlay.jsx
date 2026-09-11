@@ -8,6 +8,7 @@ export default function CheckinOverlay() {
   const [data, setData] = useState(null),
     [text, setText] = useState(''),
     [error, setError] = useState(''),
+    [editing, setEditing] = useState(false),
     [busy, setBusy] = useState(false);
   useSoundDesign(data?.settings);
   useEffect(() => {
@@ -26,6 +27,8 @@ export default function CheckinOverlay() {
         : theme || 'dark';
   }, [data?.settings.theme]);
   const p = data?.prompt;
+  const repeat = p?.kind === 'work' && p.previous;
+  const showAnswer = !repeat || editing;
   const submit = async (action, answer = text) => {
     if (!p || busy) return;
     setBusy(true);
@@ -68,31 +71,47 @@ export default function CheckinOverlay() {
                 ? 'Pourquoi tu t’es arrêté ?'
                 : 'Qu’est-ce qui t’a fait décrocher ?'}
           </h1>
-          {p.kind === 'work' && p.previous && (
-            <button
-              type="button"
-              className="repeat-work"
-              title={p.previous}
-              disabled={busy}
-              onClick={() => submit('answer', p.previous)}
-            >
-              Toujours sur « {p.previous} »
-            </button>
+          {repeat && (
+            <div className="checkin-repeat-choice">
+              <button
+                type="button"
+                className="repeat-work primary"
+                title={p.previous}
+                disabled={busy}
+                onClick={() => submit('answer', p.previous)}
+              >
+                <Check size={16} />
+                Toujours sur « {p.previous} »
+              </button>
+              {!editing && (
+                <button
+                  type="button"
+                  className="text-button"
+                  disabled={busy}
+                  onClick={() => setEditing(true)}
+                >
+                  Je travaille sur autre chose
+                </button>
+              )}
+            </div>
           )}
           {p.kind !== 'work' && (
             <p className="checkin-context">
               {p.kind === 'reason' ? 'Session en pause' : p.domain || p.app}
             </p>
           )}
-          <textarea
-            aria-label="Votre réponse"
-            placeholder={
-              p.kind === 'work' ? 'Ce que je fais…' : 'Une envie, un blocage, une interruption…'
-            }
-            maxLength={500}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
+          {showAnswer && (
+            <textarea
+              autoFocus={Boolean(repeat && editing)}
+              aria-label="Votre réponse"
+              placeholder={
+                p.kind === 'work' ? 'Ce que je fais…' : 'Une envie, un blocage, une interruption…'
+              }
+              maxLength={500}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+            />
+          )}
           {p.kind !== 'work' && (
             <div className="checkin-reasons">
               {['Fatigue', 'Notification', 'Blocage', 'Besoin de pause'].map((reason) => (
@@ -112,9 +131,11 @@ export default function CheckinOverlay() {
                 Passer
               </button>
             )}
-            <button className="primary" disabled={busy || !text.trim()}>
-              <Check size={15} /> Enregistrer
-            </button>
+            {showAnswer && (
+              <button className="primary" disabled={busy || !text.trim()}>
+                <Check size={15} /> Enregistrer
+              </button>
+            )}
           </footer>
         </form>
       )}
