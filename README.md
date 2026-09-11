@@ -137,7 +137,7 @@ Rewards now accrue one work minute per eligible observed minute. A reward might 
 
 ## Private profile (0.7)
 
-Open **Profil**, choose **Connecter mon profil**, and select the private connection JSON supplied by your site operator. Set a viewer password (12–128 characters), review privacy rules, then activate sharing. Nothing uploads before you enable it. Viewers need only your profile URL and viewer password, never the connection file. Stop and remove sharing from this same screen.
+Open **Profil**, sign in or create an account, then set a viewer password (12–128 characters), review privacy rules and activate sharing. Nothing uploads before you enable it. Viewers need your profile URL and viewer password; owners can also read their own profile using their website account. Stop and remove sharing from this same screen.
 
 Online history progressively thins older images to keep up to 90 days within 800 images (40 MB maximum). Daily totals remain lightweight and independent of screenshots. Local originals default to 90 days, up to one year in Settings, while the 1 GB default cap still applies. Existing three-day defaults migrate to 90 days; other choices stay unchanged. Exports remain outside automatic cleanup.
 
@@ -145,6 +145,10 @@ See [web/README.md](web/README.md) for storage tiers, profile isolation, operati
 
 ## Independent hosting and accounts (0.8)
 
-The recommended connection flow is now **Profil → Créer mon compte / Se connecter**, using your server URL, account identifier and password. New accounts require the server’s invitation code. No connection file is needed. Existing encrypted legacy connections keep working.
+The connection flow is **Profil → Créer mon compte / Se connecter**. Version 0.8.1 selects the shared FocusReplay service automatically. Create an account with an email, a public handle and a password; no invitation is needed on the shared service. Existing accounts can still sign in by handle. Custom server addresses and optional server invitation codes are advanced settings. Existing encrypted legacy connections keep working.
+
+The website root is a shared account entry point, never a default personal profile. Profile URLs remain separate and private. Email addresses are stored as unverified identifiers: email delivery, verification and password recovery are not configured yet. Do not present an email address as proof of ownership or grant access to someone merely claiming it. Browser sessions last 24 hours, are HttpOnly and can be revoked by logging out; they never expose desktop publishing keys. Registration is rate limited and capped at 100 accounts by default during this early beta.
+
+The check-in overlay offers **Toujours sur « … »** after the first work answer in a session. Choosing **Je travaille sur autre chose** reveals the text field.
 
 Deploy your own server from this repository using [the standalone guide](web/SELF_HOSTING.md). The [social roadmap](docs/SOCIAL_ROADMAP.md) separates accounts, friends and screenshot grants.
