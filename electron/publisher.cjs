@@ -62,7 +62,7 @@ class Publisher {
     await this.save();
     return this.state();
   }
-  async login({ url: address, profile, password, invitation, register = false }) {
+  async login({ url: address, profile, email, password, invitation, register = false }) {
     const url = new URL(address);
     if (
       (url.protocol !== 'https:' &&
@@ -77,7 +77,7 @@ class Publisher {
     )
       throw Error('Utilisez l’adresse HTTPS de votre serveur.');
     if (
-      !/^[a-z0-9][a-z0-9-]{2,39}$/.test(profile || '') ||
+      ((register || !email) && !/^[a-z0-9][a-z0-9-]{2,39}$/.test(profile || '')) ||
       typeof password !== 'string' ||
       password.length < 12 ||
       password.length > 128
@@ -90,13 +90,18 @@ class Publisher {
         redirect: 'error',
         signal: AbortSignal.timeout(20000),
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile, password, invitation }),
+        body: JSON.stringify({ profile, email, password, invitation }),
       },
     );
     const value = await response.json();
     if (!response.ok) throw Error(value.error || 'Connexion impossible.');
-    if (!/^[a-f0-9]{64}$/.test(value.key) || value.profile !== profile)
+    if (
+      !/^[a-f0-9]{64}$/.test(value.key) ||
+      !/^[a-z0-9][a-z0-9-]{2,39}$/.test(value.profile || '') ||
+      (register && value.profile !== profile)
+    )
       throw Error('Réponse du serveur invalide.');
+    profile = value.profile;
     const since =
       this.auth?.profile === profile && this.auth.url === url.origin ? this.auth.since : Date.now();
     this.auth = {

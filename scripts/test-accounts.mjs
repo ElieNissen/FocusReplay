@@ -34,8 +34,10 @@ try {
   const page = await app.firstWindow();
   await page.getByRole('button', { name: 'Profil', exact: true }).click();
   await page.getByRole('button', { name: 'Créer mon compte', exact: true }).click();
+  await page.getByText('Serveur personnalisé', { exact: true }).click();
   await page.getByLabel('Adresse du serveur', { exact: true }).fill(origin);
-  await page.getByLabel('Identifiant', { exact: true }).fill('fictional-owner');
+  await page.getByLabel('Adresse e-mail', { exact: true }).fill('owner@example.test');
+  await page.getByLabel('Pseudo', { exact: true }).fill('fictional-owner');
   await page
     .getByLabel('Mot de passe du compte', { exact: true })
     .fill('A fictional account password');

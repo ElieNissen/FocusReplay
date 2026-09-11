@@ -2,13 +2,17 @@ import React, { useState } from 'react';
 import { ChevronLeft, ExternalLink, Link, X, Plus } from 'lucide-react';
 import { dayKey, duration } from './lib.mjs';
 const api = window.focusReplay;
+const commonServer = 'https://focusreplay-private.hushed-plume-0999.chatgpt.site';
 export default function Profile({ data, busy, act, onBack }) {
   const [password, setPassword] = useState(''),
     [app, setApp] = useState(''),
     [domain, setDomain] = useState('');
   const [connecting, setConnecting] = useState(false),
     [register, setRegister] = useState(false),
-    [address, setAddress] = useState(data.share?.url ? new URL(data.share.url).origin : ''),
+    [address, setAddress] = useState(
+      data.share?.url ? new URL(data.share.url).origin : commonServer,
+    ),
+    [email, setEmail] = useState(''),
     [profile, setProfile] = useState(''),
     [accountPassword, setAccountPassword] = useState(''),
     [invitation, setInvitation] = useState('');
@@ -63,7 +67,7 @@ export default function Profile({ data, busy, act, onBack }) {
         <small>12 derniers mois · une case par jour</small>
       </section>
       <section className="profile-sharing">
-        <h2>Partager mon replay</h2>
+        <h2>Mon compte FocusReplay</h2>
         {!share.connected || connecting ? (
           <form
             onSubmit={(e) => {
@@ -72,9 +76,13 @@ export default function Profile({ data, busy, act, onBack }) {
                 await api.shareLogin({
                   url: address,
                   profile,
+                  email: register || email.includes('@') ? email : undefined,
                   password: accountPassword,
                   invitation,
                   register,
+                  ...(!register && !email.includes('@')
+                    ? { profile: email.trim().toLowerCase() }
+                    : {}),
                 });
                 setAccountPassword('');
                 setInvitation('');
@@ -92,25 +100,28 @@ export default function Profile({ data, busy, act, onBack }) {
             </div>
             <div className="profile-row">
               <label>
-                Adresse du serveur
+                {register ? 'Adresse e-mail' : 'E-mail ou identifiant'}
                 <input
-                  type="url"
-                  required
-                  value={address}
-                  placeholder="https://mon-serveur.fr"
-                  onChange={(e) => setAddress(e.target.value)}
-                />
-              </label>
-              <label>
-                Identifiant
-                <input
+                  type={register ? 'email' : 'text'}
                   autoComplete="username"
                   required
-                  pattern="[a-z0-9][a-z0-9-]{2,39}"
-                  value={profile}
-                  onChange={(e) => setProfile(e.target.value.toLowerCase())}
+                  maxLength={254}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                 />
               </label>
+              {register && (
+                <label>
+                  Pseudo
+                  <input
+                    autoComplete="nickname"
+                    required
+                    pattern="[a-z0-9][a-z0-9-]{2,39}"
+                    value={profile}
+                    onChange={(e) => setProfile(e.target.value.toLowerCase())}
+                  />
+                </label>
+              )}
             </div>
             <div className="profile-row">
               <label>
@@ -125,19 +136,40 @@ export default function Profile({ data, busy, act, onBack }) {
                   onChange={(e) => setAccountPassword(e.target.value)}
                 />
               </label>
-              {register && (
+              {register && address !== commonServer && (
                 <label>
                   Code d’invitation
                   <input
-                    required
                     value={invitation}
                     onChange={(e) => setInvitation(e.target.value.trim())}
                   />
                 </label>
               )}
             </div>
+            <details>
+              <summary>Serveur personnalisé</summary>
+              <label>
+                Adresse du serveur
+                <input
+                  type="url"
+                  required
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => {
+                  setAddress(commonServer);
+                  setInvitation('');
+                }}
+              >
+                Utiliser FocusReplay
+              </button>
+            </details>
             <button className="primary" disabled={busy}>
-              {register ? 'Créer mon compte' : 'Connecter mon profil'}
+              {busy ? 'Connexion…' : register ? 'Créer mon compte' : 'Se connecter'}
             </button>
             {share.connected && (
               <button type="button" onClick={() => setConnecting(false)}>
