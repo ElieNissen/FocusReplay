@@ -23,7 +23,7 @@
 
 ## Run on Windows
 
-Requires Windows 10/11 x64. The interface is in French. A portable build runs without a development environment; building from source requires Node.js 24 LTS and Git.
+Requires Windows 10/11 x64. The interface is in French. Building from source requires Node.js 24 LTS and Git. Previously supplied unsigned portable builds can be blocked by Smart App Control; see [Windows distribution](docs/WINDOWS_RELEASE.md).
 
 French walkthrough: [Essayer FocusReplay avec de vraies données](docs/DEMARRER.fr.md).
 
@@ -41,13 +41,13 @@ Click **Commencer une session**, then get on with your day. You can review immed
 
 For music and capture options, open **Réglages**. Reducing retention or the cap deletes eligible old captures immediately. Export a replay before its captures expire if you want to keep it.
 
-## Build a portable executable
+## Build a signed Windows installer
 
 ```powershell
 npm run dist
 ```
 
-The build is written to `release/FocusReplay-0.6.0-Windows.exe`. It is unsigned; Windows may show a publisher warning. Signing and a public binary release are not configured. The encoder's third-party notices and source-distribution requirements are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The installer is written to `release/FocusReplay-VERSION-Setup.exe`. A trusted signing identity is required: the release command fails when it is missing. The per-user installation avoids extracting the full application on every launch, and preserves existing recordings. No signed public release is available yet. `npm run dist:unsigned` is only for local installer construction tests and does not resolve Smart App Control blocks. See [the signing and release checklist](docs/WINDOWS_RELEASE.md). The encoder's third-party notices and source-distribution requirements are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## What the numbers mean
 

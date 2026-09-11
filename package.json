@@ -17,7 +17,8 @@
     "test": "node --test tests/*.test.cjs",
     "test:e2e": "npm run build && node scripts/e2e.mjs",
     "check:privacy": "node scripts/privacy-check.mjs",
-    "dist": "npm run build && node scripts/prepare-licenses.mjs && electron-builder --win portable --publish never",
+    "dist": "npm run build && node scripts/prepare-licenses.mjs && electron-builder --win nsis --config.forceCodeSigning=true --publish never",
+    "dist:unsigned": "npm run build && node scripts/prepare-licenses.mjs && electron-builder --win nsis --config.forceCodeSigning=false --config.win.signExecutable=false --publish never",
     "dist:dir": "npm run build && node scripts/prepare-licenses.mjs && electron-builder --dir --publish never",
     "test:timeline": "npm run build && node scripts/test-timeline.mjs"
   },
@@ -57,13 +58,22 @@
     ],
     "win": {
       "target": [
-        "portable"
+        "nsis"
       ],
       "icon": "build/icon.ico",
-      "signExecutable": false
+      "signExecutable": true,
+      "signExts": [".dll", ".ps1"]
     },
     "portable": {
       "artifactName": "FocusReplay-${version}-Windows.exe"
+    },
+    "nsis": {
+      "artifactName": "FocusReplay-${version}-Setup.exe",
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": false,
+      "createDesktopShortcut": true,
+      "deleteAppDataOnUninstall": false
     },
     "extraResources": [
       {
