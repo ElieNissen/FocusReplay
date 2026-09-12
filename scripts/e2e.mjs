@@ -309,7 +309,14 @@ try {
   await page.screenshot({ path: path.join(root, 'settings-light.png'), fullPage: true });
   await page.getByRole('button', { name: 'Retour au replay', exact: true }).click();
   await page.getByRole('button', { name: 'Commencer une session', exact: true }).click();
-  await expect(page.getByText('Capture active', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.focusReplay.state().then((s) => s.sessions.find((x) => !x.endedAt)?.status),
+      ),
+    )
+    .toBe('recording');
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -391,7 +398,14 @@ try {
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: path.join(root, 'pause-ended.png'), fullPage: true });
   await page.getByRole('button', { name: 'Reprendre', exact: true }).click();
-  await expect(page.getByText('Capture active', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.focusReplay.state().then((s) => s.sessions.find((x) => !x.endedAt)?.status),
+      ),
+    )
+    .toBe('recording');
   await expect
     .poll(
       () =>
@@ -467,9 +481,7 @@ try {
     )
     .toBe('Fatigue');
   await page.locator('.timeline-note').last().click();
-  await expect(
-    page.locator('.marker-detail').getByText('Fatigue', { exact: true }),
-  ).toBeVisible();
+  await expect(page.locator('.marker-detail').getByText('Fatigue', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Terminer', exact: true }).click();
   await expect(page.getByText('Caméra autorisée', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Pauses & récompenses', exact: true }).click();
