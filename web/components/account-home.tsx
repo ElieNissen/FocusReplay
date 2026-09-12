@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowRight, UserRound } from 'lucide-react';
+import Social, { Discover } from './social';
 
 export default function AccountHome() {
   const [account, setAccount] = useState<{ profile: string } | null>(null);
@@ -107,26 +108,23 @@ export default function AccountHome() {
         <a href="/" className="wordmark">
           FocusReplay
         </a>
-        <span>Vos journées, en replay.</span>
+        <div className="social-buttons">
+          <a href="https://github.com/ElieNissen/FocusReplay/releases/download/v0.8.4/FocusReplay-0.8.4-Setup-NonSigne.exe">
+            Télécharger pour Windows
+          </a>
+          <a href={account ? '/?profile=' + account.profile : '#connexion'}>
+            {account ? 'Mon replay' : 'Se connecter / créer un compte'}
+          </a>
+        </div>
       </header>
+      <p className="download-note">
+        Windows · version d’essai non signée, susceptible d’être bloquée par Smart App Control.
+      </p>
       {loading ? (
         <p role="status">Connexion…</p>
       ) : account ? (
-        <section className="account-welcome">
-          <UserRound size={28} />
-          <h1>Bonjour, {account.profile}</h1>
-          <p>Retrouvez vos sessions partagées et votre activité.</p>
-          <a
-            className="account-primary-link"
-            href={'/?profile=' + encodeURIComponent(account.profile)}
-          >
-            Mon profil <ArrowRight size={18} />
-          </a>
-          <p className="account-hint">
-            Pour envoyer vos sessions, connectez le même compte dans l’application Windows et
-            activez le partage.
-          </p>
-          {visit}
+        <section className="account-welcome social-welcome">
+          <Social profile={account.profile} />
           <Button
             variant="ghost"
             disabled={busy}
@@ -148,76 +146,79 @@ export default function AccountHome() {
           </Button>
         </section>
       ) : (
-        <section className="account-entry">
-          <h1>{register ? 'Créer un compte' : 'Se connecter'}</h1>
-          <form onSubmit={submit}>
-            <label htmlFor="account-email">
-              {register ? 'Adresse e-mail' : 'E-mail ou identifiant'}
-            </label>
-            <Input
-              id="account-email"
-              type={register ? 'email' : 'text'}
-              autoComplete="username"
-              required
-              maxLength={254}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            {register && (
-              <>
-                <label htmlFor="account-profile">Pseudo</label>
-                <Input
-                  id="account-profile"
-                  autoComplete="nickname"
-                  required
-                  pattern="[a-z0-9][a-z0-9-]{2,39}"
-                  minLength={3}
-                  maxLength={40}
-                  value={profile}
-                  onChange={(e) => setProfile(e.target.value.toLowerCase())}
-                />
-              </>
-            )}
-            <label htmlFor="account-password">Mot de passe</label>
-            <Input
-              id="account-password"
-              type="password"
-              autoComplete={register ? 'new-password' : 'current-password'}
-              required
-              minLength={12}
-              maxLength={128}
-              placeholder={register ? '12 caractères minimum' : ''}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            {register && inviteRequired && (
-              <>
-                <label htmlFor="account-invite">Code d’invitation de ce serveur</label>
-                <Input
-                  id="account-invite"
-                  required
-                  value={invitation}
-                  onChange={(e) => setInvitation(e.target.value.trim())}
-                />
-              </>
-            )}
-            <Button disabled={busy || inviteRequired === null}>
-              {busy ? 'Connexion…' : register ? 'Créer mon compte' : 'Se connecter'}
+        <>
+          <Discover />
+          <section className="account-entry" id="connexion">
+            <h1>{register ? 'Créer un compte' : 'Se connecter'}</h1>
+            <form onSubmit={submit}>
+              <label htmlFor="account-email">
+                {register ? 'Adresse e-mail' : 'E-mail ou identifiant'}
+              </label>
+              <Input
+                id="account-email"
+                type={register ? 'email' : 'text'}
+                autoComplete="username"
+                required
+                maxLength={254}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              {register && (
+                <>
+                  <label htmlFor="account-profile">Pseudo</label>
+                  <Input
+                    id="account-profile"
+                    autoComplete="nickname"
+                    required
+                    pattern="[a-z0-9][a-z0-9-]{2,39}"
+                    minLength={3}
+                    maxLength={40}
+                    value={profile}
+                    onChange={(e) => setProfile(e.target.value.toLowerCase())}
+                  />
+                </>
+              )}
+              <label htmlFor="account-password">Mot de passe</label>
+              <Input
+                id="account-password"
+                type="password"
+                autoComplete={register ? 'new-password' : 'current-password'}
+                required
+                minLength={12}
+                maxLength={128}
+                placeholder={register ? '12 caractères minimum' : ''}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              {register && inviteRequired && (
+                <>
+                  <label htmlFor="account-invite">Code d’invitation de ce serveur</label>
+                  <Input
+                    id="account-invite"
+                    required
+                    value={invitation}
+                    onChange={(e) => setInvitation(e.target.value.trim())}
+                  />
+                </>
+              )}
+              <Button disabled={busy || inviteRequired === null}>
+                {busy ? 'Connexion…' : register ? 'Créer mon compte' : 'Se connecter'}
+              </Button>
+            </form>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => {
+                setRegister(!register);
+                setError('');
+                setPassword('');
+              }}
+            >
+              {register ? 'Déjà un compte ? Se connecter' : 'Créer un compte'}
             </Button>
-          </form>
-          <Button
-            variant="ghost"
-            disabled={busy}
-            onClick={() => {
-              setRegister(!register);
-              setError('');
-              setPassword('');
-            }}
-          >
-            {register ? 'Déjà un compte ? Se connecter' : 'Créer un compte'}
-          </Button>
-          {visit}
-        </section>
+            {visit}
+          </section>
+        </>
       )}
       {error && (
         <p className="account-error" role="alert">

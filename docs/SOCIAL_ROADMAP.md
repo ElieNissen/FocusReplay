@@ -2,6 +2,10 @@
 
 Current capacity and implementation priorities: [SCALABILITY.md](SCALABILITY.md). That plan supersedes the historical invitation-only stages below: the shared service now has bounded open registration. Raising its account cap requires load testing. The hosted service already uses D1 and R2; the SQLite/filesystem migration discussion below applies to the optional standalone adapter, not the currently hosted objects. PostgreSQL is an option justified by measurements, not an automatic migration at a particular user count. Password-protected guest viewing remains supported alongside account-based friend permissions.
 
+## Shipped in 0.8.4
+
+Public Feed/Room, opt-in discovery/statistics and separately opted-in delayed previews, friend requests/acceptance/removal/blocking, and independent presence/statistics/software/live/archive grants are implemented. Guest passwords remain supported. Later stages below are historical planning. Account recovery, email verification, immutable IDs distinct from handles, incremental sync and operator budgets remain unfinished. Current handles cannot be renamed, so relationship keys remain stable.
+
 ## Ownership boundary
 
 The primary product is a centrally hosted service: users register and connect through the interface, with no server, connection file or hosting account of their own. Self-hosting is an optional portability and ownership guarantee, not the normal onboarding requirement. Start with the existing managed Worker, D1 database and private R2 object storage; keep invitations during the small-group beta. Do not provision a second server just to duplicate these services. A branded domain and measured service budgets precede broader promotion.

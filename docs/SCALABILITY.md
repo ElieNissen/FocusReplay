@@ -1,16 +1,16 @@
 # One FocusReplay network
 
-## Current evidence, 2026-09-11
+## Current evidence, 2026-09-12
 
-The product has one common origin and separate accounts/profiles. A user does not deploy a server. Adding backend capacity must preserve that origin and those account identities. A discoverable profile means a discoverable identity, not public access to screenshots, software history or live activity. A people directory, friendships and a multi-friend live feed are planned, not implemented.
+The product has one common origin and separate accounts/profiles. A user does not deploy a server. Adding backend capacity must preserve that origin and those account identities. A discoverable profile means a discoverable identity, not public access to screenshots, software history or live activity. The opt-in public Feed/Room, friend requests and blocks, and separate presence, statistics, software, live-session and archive grants are implemented. Public screenshots require a separate opt-in; other cards use a synthetic private placeholder.
 
 The shared deployment was configured for 100 accounts. `web/lib/share-api.ts` defaults to 100 and allows an operator setting up to 10,000. Neither number is a load-test result. No concurrent-user capacity, current occupancy, service-level guarantee, or hosting-provider budget has been established by this audit. Sites-managed quotas and billing cannot be inferred from Cloudflare's public free tier. Do not load-test the live site without a separate bounded test plan.
 
 Online image policy: at most 800 JPEGs of 50,000 bytes each per profile, 90-day maximum age, adaptive density by age. At the policy ceiling, 100 profiles represent 4 GB of active images; 1,000 represent 40 GB; 10,000 represent 400 GB. These are decimal image-only quantities, excluding metadata, backups, operations and temporarily uncollected objects. Increasing retention without increasing this budget reduces archive density. Daily totals can outlive images.
 
-Current publishers sync every 30 seconds; each cycle reads one full manifest and writes it twice, plus new image uploads. Each open viewer requests the full manifest every 15 seconds. Images are delayed by at least 60 seconds; polling, capture cadence, sampling, network and upload time can make them older. Presence expires after two minutes without updates. Scheduled physical cleanup is still needed when a publisher never reconnects.
+Current publishers sync every five minutes; each cycle reads one full manifest and writes it twice, plus new image uploads. Each open viewer requests the full manifest every three minutes. Images are delayed by at least 60 seconds; polling, capture cadence, sampling, network and upload time can make them older. Presence expires after fifteen minutes without updates. Scheduled physical cleanup is still needed when a publisher never reconnects.
 
-For P active publishers and V open single-profile viewers, baseline metadata traffic is roughly `3P/30 + V/15` requests per second before authentication, media requests and retries. With P=100 and V=100 that is about 17 requests/second. This is a workload model, not a benchmark. Full manifests may be up to 1.5 MB, so byte volume and parsing matter as well as request count. Implementing 20 friends by copying the existing polling loop would multiply viewer requests by 20.
+For P active publishers and V open single-profile viewers, baseline metadata traffic is roughly `3P/300 + V/180` requests per second before authentication, media requests and retries. With P=100 and V=100 that is about 1.56 requests/second. This is a workload model, not a benchmark. Full manifests may be up to 1.5 MB, so byte volume and parsing matter as well as request count. Implementing 20 friends by copying the existing polling loop would multiply viewer requests by 20.
 
 ## Target data model and permissions
 
@@ -37,3 +37,11 @@ Test each stage with both normal small audiences and a concentrated profile watc
 - [Durable Objects and WebSockets](https://developers.cloudflare.com/durable-objects/best-practices/websockets/): a possible fan-out implementation, not a service provisioned by this plan.
 
 This is an implementation roadmap. It does not change production quotas, publish user data, provision paid services or claim that the social features already exist.
+
+## Public discovery and zero-cost beta
+
+Public cards are paginated by 20 and refreshed every three minutes in visible tabs only. Visible cards download up to six explicitly public frames (50 KB maximum each), delayed at least five minutes, then play them locally. A cold page may cost 120 image reads / 6 MB. Revoking a preview prevents new reads but cannot recall downloaded images. Public content remains public when a blocked person logs out; use private sharing for confidentiality.
+
+Sites manages the existing Workers/D1/R2 deployment. Its account-specific allowance is unknown. Cloudflare public free tiers are comparisons, not this deployment quota or a spending cap: Workers 100,000 requests/day; D1 5 million rows read and 100,000 rows written/day; R2 10 GB plus 1 million Class A and 10 million Class B operations/month. No paid service was provisioned. Keep the 100-account ceiling and begin with 10 active testers; measure before enlarging the cohort. No free concurrent-user capacity has been demonstrated.
+
+References: https://developers.cloudflare.com/workers/platform/limits/ ; https://developers.cloudflare.com/d1/platform/pricing/ ; https://developers.cloudflare.com/r2/pricing/ .

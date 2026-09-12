@@ -636,7 +636,7 @@ else {
       });
       publisher = new Publisher({ recorder, safeStorage, nativeImage });
       await publisher.init();
-      shareTimer = setInterval(() => publisher.sync().then(() => recorder.changed()), 30000);
+      shareTimer = setInterval(() => publisher.sync().then(() => recorder.changed()), 300000);
       checkins = new Checkins({ recorder, present: presentCheckin, close: closeCheckin, showMain });
       createMain();
       tray = new Tray(icon());

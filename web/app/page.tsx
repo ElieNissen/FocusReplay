@@ -70,6 +70,7 @@ function Replay({ profile }: { profile: string }) {
     [follow, setFollow] = useState(true),
     [playing, setPlaying] = useState(false);
   async function refresh() {
+    if(document.hidden) return;
     try {
       const r = await fetch(apiPath('/snapshot'), { cache: 'no-store' });
       if (r.status === 401) {
@@ -88,8 +89,9 @@ function Replay({ profile }: { profile: string }) {
   }
   useEffect(() => {
     refresh();
-    const t = setInterval(refresh, 15000);
-    return () => clearInterval(t);
+    const t = setInterval(refresh, 180000);
+    document.addEventListener('visibilitychange',refresh);
+    return () => {clearInterval(t);document.removeEventListener('visibilitychange',refresh);};
   }, []);
   const frames = (data?.frames || []).filter((f: any) => !day || f.day === day);
   const index =
