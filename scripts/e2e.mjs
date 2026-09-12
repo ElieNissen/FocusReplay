@@ -483,7 +483,17 @@ try {
   await page.locator('.timeline-note').last().click();
   await expect(page.locator('.marker-detail').getByText('Fatigue', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Terminer', exact: true }).click();
-  await expect(page.getByText('Caméra autorisée', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Commencer une session', exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('.camera-status')).toHaveText('Caméra autorisée');
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.focusReplay.state().then((s) => s.sessions.some((x) => !x.endedAt)),
+      ),
+    )
+    .toBe(false);
   await page.getByRole('button', { name: 'Pauses & récompenses', exact: true }).click();
   await page.getByRole('checkbox', { name: 'Activer les récompenses' }).click();
   await expect(page.getByRole('checkbox', { name: 'Activer les récompenses' })).toBeChecked();
