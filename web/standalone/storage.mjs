@@ -15,12 +15,16 @@ export async function storage(directory) {
   const sql = new DatabaseSync(path.join(directory, 'focusreplay.sqlite'));
   sql.exec('PRAGMA journal_mode=WAL;');
   // Idempotent schema migration for a fresh or restarted standalone instance.
-  if (sql.prepare('PRAGMA user_version').get().user_version === 0) {
+  const journal = JSON.parse(
+    await fs.readFile(new URL('../drizzle/meta/_journal.json', import.meta.url), 'utf8'),
+  );
+  for (const entry of journal.entries) {
+    if (sql.prepare('PRAGMA user_version').get().user_version > entry.idx) continue;
     const migration = await fs.readFile(
-      new URL('../drizzle/0000_zippy_valkyrie.sql', import.meta.url),
+      new URL('../drizzle/' + entry.tag + '.sql', import.meta.url),
       'utf8',
     );
-    sql.exec('BEGIN;' + migration + ';PRAGMA user_version=1;COMMIT;');
+    sql.exec('BEGIN;' + migration + ';PRAGMA user_version=' + (entry.idx + 1) + ';COMMIT;');
   }
   const DB = {
     prepare(query) {
@@ -28,6 +32,7 @@ export async function storage(directory) {
         bind(...args) {
           return {
             first: async () => sql.prepare(query).get(...args),
+            all: async () => ({ results: sql.prepare(query).all(...args) }),
             run: async () => sql.prepare(query).run(...args),
           };
         },

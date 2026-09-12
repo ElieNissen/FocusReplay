@@ -1,3 +1,4 @@
+import { socialRoute, updateSocialSummary, friendScope, scopedReplay } from './social-api.ts';
 const headers = {
   'Cache-Control': 'no-store, private',
   'X-Content-Type-Options': 'nosniff',
@@ -250,6 +251,8 @@ export async function route(request: Request, e: any) {
     bucket = e.BUCKET,
     url = new URL(request.url);
   if (url.pathname.startsWith('/api/account/')) return accountRoute(request, e);
+  if (url.pathname === '/api/social' || url.pathname.startsWith('/api/social/'))
+    return socialRoute(request, e, { json, browserAccount, limitedBody });
   const match = url.pathname.match(/^\/api\/p\/([a-z0-9-]{1,48})(\/.*)$/);
   if (!match) return json({ error: 'Profil introuvable.' }, 404);
   const profile = match[1],
@@ -330,6 +333,7 @@ export async function route(request: Request, e: any) {
       body.frames = body.frames.filter((f: any) => f.at > Date.now() - 90 * 86400000);
       body.syncedAt = Date.now();
       await statePut('snapshot', body);
+      await updateSocialSummary(db, profile, body);
       // An image is served only while listed in the current manifest. Removed/redacted images become inaccessible immediately.
       const allowed = new Set(body.frames.filter((f: any) => !f.private).map((f: any) => f.id));
       let cursor: string | undefined;
@@ -346,6 +350,7 @@ export async function route(request: Request, e: any) {
     }
     if (path === '/api/snapshot' && request.method === 'DELETE') {
       await statePut('snapshot', null);
+      await updateSocialSummary(db, profile, null);
       let cursor: string | undefined;
       do {
         const list: any = await bucket.list({ prefix, limit: 1000, cursor });
@@ -380,17 +385,19 @@ export async function route(request: Request, e: any) {
       .find((v) => v.startsWith(cookieName + '='))
       ?.slice(cookieName.length + 1) || '';
   const [expires, revision, signature] = cookie.split('.');
-  const ownRead = request.method === 'GET' && (await browserAccount(request, e)) === profile;
-  if (
-    !ownRead &&
-    (!config ||
-      revision !== config.revision ||
-      Number(expires) < Date.now() ||
-      !signature ||
-      signature !== (await sign(expires + '.' + revision, profileKey)))
-  )
-    return json({ error: 'Mot de passe requis.' }, 401);
-  const snapshot = await stateGet('snapshot');
+  const reader = request.method === 'GET' ? await browserAccount(request, e) : null;
+  const ownRead = request.method === 'GET' && reader === profile;
+  const guestRead = Boolean(
+    config &&
+    revision === config.revision &&
+    Number(expires) >= Date.now() &&
+    signature &&
+    signature === (await sign(expires + '.' + revision, profileKey)),
+  );
+  const grant = !ownRead && !guestRead && reader ? await friendScope(db, profile, reader) : null;
+  if (!ownRead && !guestRead && !grant) return json({ error: 'Mot de passe requis.' }, 401);
+  const rawSnapshot = await stateGet('snapshot');
+  const snapshot = grant ? scopedReplay(rawSnapshot, grant) : rawSnapshot;
   if (path === '/api/snapshot' && request.method === 'GET') {
     if (!snapshot)
       return json({
@@ -401,7 +408,7 @@ export async function route(request: Request, e: any) {
         syncedAt: 0,
       });
     snapshot.frames = snapshot.frames.filter((f: any) => f.at > Date.now() - 90 * 86400000);
-    if (Date.now() - snapshot.syncedAt > 120000) snapshot.status = 'offline';
+    if (Date.now() - snapshot.syncedAt > 900000) snapshot.status = 'offline';
     return json(snapshot);
   }
   if (path.startsWith('/api/image/') && request.method === 'GET') {

@@ -8,6 +8,34 @@
       "when": 1789030672720,
       "tag": "0000_zippy_valkyrie",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1789163286475,
+      "tag": "0001_thin_white_queen",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789163351324,
+      "tag": "0002_rare_black_bolt",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789163742234,
+      "tag": "0003_dear_crusher_hogan",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789163874703,
+      "tag": "0004_right_skrulls",
+      "breakpoints": true
     }
   ]
 }
