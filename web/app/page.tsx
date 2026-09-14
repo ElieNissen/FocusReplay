@@ -1,5 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { Chip } from '@heroui/react';
+import { replayGroups } from '@/lib/replay-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -25,17 +27,19 @@ function CaptureImage({
   syncedAt,
   alt = '',
   lazy = false,
+  source = 'screen',
 }: {
   id: string;
   syncedAt: number;
   alt?: string;
   lazy?: boolean;
+  source?: string;
 }) {
   const [failed, setFailed] = useState(false);
   return (
     <img
       loading={lazy ? 'lazy' : 'eager'}
-      src={apiPath('/image/' + id) + (failed ? '?retry=' + syncedAt : '')}
+      src={apiPath('/image/' + id) + '?source=' + source + (failed ? '&retry=' + syncedAt : '')}
       alt={alt}
       onError={() => setFailed(true)}
       onLoad={(e) => {
@@ -69,8 +73,21 @@ function Replay({ profile }: { profile: string }) {
     [cursor, setCursor] = useState<number | null>(null),
     [follow, setFollow] = useState(true),
     [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(2),
+    [zoom, setZoom] = useState(1);
+  const timeline = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = timeline.current;
+    if (!node) return;
+    const wheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setZoom((z) => Math.max(1, Math.min(8, z + (e.deltaY < 0 ? 0.25 : -0.25))));
+    };
+    node.addEventListener('wheel', wheel, { passive: false });
+    return () => node.removeEventListener('wheel', wheel);
+  }, [locked, data?.frames?.length]);
   async function refresh() {
-    if(document.hidden) return;
+    if (document.hidden) return;
     try {
       const r = await fetch(apiPath('/snapshot'), { cache: 'no-store' });
       if (r.status === 401) {
@@ -90,8 +107,11 @@ function Replay({ profile }: { profile: string }) {
   useEffect(() => {
     refresh();
     const t = setInterval(refresh, 180000);
-    document.addEventListener('visibilitychange',refresh);
-    return () => {clearInterval(t);document.removeEventListener('visibilitychange',refresh);};
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', refresh);
+    };
   }, []);
   const frames = (data?.frames || []).filter((f: any) => !day || f.day === day);
   const index =
@@ -113,12 +133,18 @@ function Replay({ profile }: { profile: string }) {
     const t = setTimeout(() => {
       if (index >= frames.length - 1) setPlaying(false);
       else step(1);
-    }, 500);
+    }, 1000 / speed);
     return () => clearTimeout(t);
-  }, [playing, index, frames.length]);
+  }, [playing, index, frames.length, speed]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).matches('input,textarea') || locked) return;
+      if (
+        (e.target as HTMLElement).closest(
+          'input,textarea,select,button,[role="slider"],[role="combobox"]',
+        ) ||
+        locked
+      )
+        return;
       if (['q', 'ArrowLeft'].includes(e.key)) {
         e.preventDefault();
         step(-1);
@@ -129,6 +155,8 @@ function Replay({ profile }: { profile: string }) {
       }
       if (e.code === 'Space') {
         e.preventDefault();
+        setFollow(false);
+        if (index === frames.length - 1) setCursor(frames[0]?.at || 0);
         setPlaying((p) => !p);
       }
     };
@@ -219,19 +247,21 @@ function Replay({ profile }: { profile: string }) {
       </header>
       <section className="activity">
         <strong>{hours(calendar.reduce((n, d) => n + d.ms, 0))} de travail</strong>
-        <div className="calendar" aria-label="Activité des douze derniers mois">
-          {calendar.map((d) => (
-            <span
-              key={d.day}
-              title={d.day + ' · ' + hours(d.ms)}
-              style={{
-                opacity: d.ms ? Math.min(1, 0.3 + d.ms / 28800000) : 0.1,
-              }}
-              className={d.ms ? 'worked' : ''}
-            />
-          ))}
-        </div>
-        <small>12 derniers mois · une case par jour</small>
+        <details>
+          <summary>Activité des 12 derniers mois</summary>
+          <div className="calendar" aria-label="Activité des douze derniers mois">
+            {calendar.map((d) => (
+              <span
+                key={d.day}
+                title={d.day + ' · ' + hours(d.ms)}
+                style={{
+                  opacity: d.ms ? Math.min(1, 0.3 + d.ms / 28800000) : 0.1,
+                }}
+                className={d.ms ? 'worked' : ''}
+              />
+            ))}
+          </div>
+        </details>
       </section>
       <nav className="days">
         <Button
@@ -257,9 +287,6 @@ function Replay({ profile }: { profile: string }) {
           </Button>
         ))}
       </nav>
-      <p className="history-caption">
-        90 jours maximum · les captures anciennes sont progressivement espacées
-      </p>
       <section className="screen">
         {!frame ? (
           <p>Aucune session partagée pour le moment.</p>
@@ -269,6 +296,10 @@ function Replay({ profile }: { profile: string }) {
           <p>
             <Lock /> Données privées
           </p>
+        ) : frame.available === false ? (
+          <p>
+            <Lock /> Écran masqué ou image indisponible
+          </p>
         ) : (
           <CaptureImage
             key={frame.id}
@@ -276,6 +307,31 @@ function Replay({ profile }: { profile: string }) {
             syncedAt={data.syncedAt}
             alt={'Capture à ' + time(frame.at)}
           />
+        )}
+        {!gap && !frame?.private && frame?.cameraAvailable && (
+          <div className="replay-camera">
+            <CaptureImage
+              key={frame.id + 'camera'}
+              id={frame.id}
+              source="camera"
+              syncedAt={data.syncedAt}
+              alt={'Caméra à ' + time(frame.at)}
+            />
+          </div>
+        )}
+        {frame && !frame.private && (
+          <div className="replay-visibility">
+            <Chip>
+              {frame.screenMode === 'blurred'
+                ? 'Écran flouté'
+                : frame.available === false
+                  ? 'Écran masqué'
+                  : 'Écran visible'}
+            </Chip>
+            {frame.cameraAvailable && (
+              <Chip>{frame.cameraMode === 'blurred' ? 'Caméra floutée' : 'Caméra visible'}</Chip>
+            )}
+          </div>
         )}
       </section>
       {frame && (
@@ -309,71 +365,118 @@ function Replay({ profile }: { profile: string }) {
                 setPlaying(false);
               }}
             >
-              Dernière image
+              Live · dernière capture
             </Button>
           </div>
-          <Slider
-            aria-label="Timeline du replay"
-            min={frames[0].at}
-            max={Math.max(frames[0].at + 1, frames.at(-1).at)}
-            value={[position]}
-            onValueChange={([value]) => {
-              setCursor(value);
-              setFollow(false);
-              setPlaying(false);
-            }}
-          />
-          <div
-            className="software-track"
-            aria-label="Logiciels dominants par période de cinq minutes"
-          >
-            {(data.overview || [])
-              .filter((a: any) => a.to >= frames[0].at && a.from <= frames.at(-1).at)
-              .map((a: any) => (
-                <button
-                  key={a.from}
-                  title={a.app + ' · ' + time(a.from) + '–' + time(a.to)}
-                  className={a.category}
-                  style={{
-                    left:
-                      Math.max(
-                        0,
-                        ((a.from - frames[0].at) / Math.max(1, frames.at(-1).at - frames[0].at)) *
-                          100,
-                      ) + '%',
-                    width:
-                      Math.max(
-                        0,
-                        ((Math.min(a.to, frames.at(-1).at) - Math.max(a.from, frames[0].at)) /
-                          Math.max(1, frames.at(-1).at - frames[0].at)) *
-                          100,
-                      ) + '%',
-                  }}
-                  onClick={() => {
-                    setCursor(a.from);
-                    setFollow(false);
-                  }}
-                >
-                  {a.app}
-                </button>
-              ))}
+          <div className="replay-adjustments">
+            <label>
+              Lecture · {speed} img/s
+              <Slider
+                aria-label="Vitesse de lecture"
+                min={1}
+                max={8}
+                step={1}
+                value={[speed]}
+                onValueChange={([v]) => setSpeed(v)}
+              />
+            </label>
+            <label>
+              Zoom · ×{zoom.toFixed(1)}
+              <Slider
+                aria-label="Zoom de la timeline"
+                min={1}
+                max={8}
+                step={0.25}
+                value={[zoom]}
+                onValueChange={([v]) => setZoom(v)}
+              />
+            </label>
+            <small>
+              {frame.at ? 'Capture du ' + new Date(frame.at).toLocaleString('fr-FR') : ''}
+            </small>
           </div>
-          <div className="filmstrip">
-            {frames
-              .filter((_: any, i: number) => i % Math.max(1, Math.floor(frames.length / 20)) === 0)
-              .map((f: any) => (
-                <button
-                  key={f.id}
-                  onClick={() => {
-                    setCursor(f.at);
-                    setFollow(false);
-                  }}
-                  title={time(f.at)}
-                >
-                  {f.private ? <Lock /> : <CaptureImage id={f.id} syncedAt={data.syncedAt} lazy />}
-                  <span>{time(f.at)}</span>
-                </button>
-              ))}
+          <div className="replay-timeline-scroll" ref={timeline}>
+            <div className="replay-timeline-content" style={{ width: zoom * 100 + '%' }}>
+              <Slider
+                aria-label="Timeline du replay"
+                min={frames[0].at}
+                max={Math.max(frames[0].at + 1, frames.at(-1).at)}
+                value={[position]}
+                onValueChange={([value]) => {
+                  setCursor(value);
+                  setFollow(false);
+                  setPlaying(false);
+                }}
+              />
+              <div className="software-track" aria-label="Logiciels utilisés">
+                {replayGroups(data.overview || [], frames[0].at, frames.at(-1).at, zoom).map(
+                  (a: any) => (
+                    <button
+                      key={a.from}
+                      title={time(a.from) + '–' + time(a.to) + '\n' + a.title}
+                      className={a.category}
+                      style={{
+                        left:
+                          Math.max(
+                            0,
+                            ((a.from - frames[0].at) /
+                              Math.max(1, frames.at(-1).at - frames[0].at)) *
+                              100,
+                          ) + '%',
+                        width:
+                          Math.max(
+                            0,
+                            ((Math.min(a.to, frames.at(-1).at) - Math.max(a.from, frames[0].at)) /
+                              Math.max(1, frames.at(-1).at - frames[0].at)) *
+                              100,
+                          ) + '%',
+                      }}
+                      onClick={() => {
+                        setCursor(a.from);
+                        setFollow(false);
+                      }}
+                    >
+                      {a.app}
+                    </button>
+                  ),
+                )}
+              </div>
+              <div
+                className="filmstrip"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${Math.ceil(12 * zoom)},1fr)`,
+                }}
+              >
+                {Array.from({ length: Math.ceil(12 * zoom) }, (_, i) => {
+                  const at =
+                    frames[0].at +
+                    ((frames.at(-1).at - frames[0].at) * i) / Math.max(1, Math.ceil(12 * zoom) - 1);
+                  const f = frames.findLast((f: any) => f.at <= at) || frames[0];
+                  const pause = (data.gaps || []).find((g: any) => at >= g.from && at < g.to);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        setCursor(at);
+                        setFollow(false);
+                      }}
+                      title={time(at)}
+                      className={pause ? 'replay-gap' : ''}
+                    >
+                      {pause ? (
+                        <strong>{pause.label}</strong>
+                      ) : f.private || f.available === false ? (
+                        <Lock />
+                      ) : (
+                        <CaptureImage id={f.id} syncedAt={data.syncedAt} lazy />
+                      )}
+                      <span>{time(at)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </>
       )}

@@ -109,7 +109,7 @@ export default function AccountHome() {
           FocusReplay
         </a>
         <div className="social-buttons">
-          <a href="https://github.com/ElieNissen/FocusReplay/releases/download/v0.8.4/FocusReplay-0.8.4-Setup-NonSigne.exe">
+          <a href="https://github.com/ElieNissen/FocusReplay/releases/download/v0.9.0/FocusReplay-0.9.0-Setup-NonSigne.exe">
             Télécharger pour Windows
           </a>
           <a href={account ? '/?profile=' + account.profile : '#connexion'}>
@@ -228,3 +228,4 @@ export default function AccountHome() {
     </main>
   );
 }
+

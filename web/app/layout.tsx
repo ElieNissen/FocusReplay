@@ -1,3 +1,5 @@
+import '@fontsource/geist/latin-400.css';
+import '@fontsource/geist/latin-600.css';
 import type { Metadata } from "next";
 import "./globals.css";
 
@@ -25,4 +27,5 @@ export default function RootLayout({
     </html>
   );
 }
+
 

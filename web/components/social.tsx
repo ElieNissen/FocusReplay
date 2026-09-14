@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SharingControls, defaultSharing } from './sharing-controls';
 import { Radio, Users, LayoutGrid, List, ArrowUpRight, Lock } from 'lucide-react';
 const hours = (ms: number) =>
   (ms / 3600000).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) + ' h';
@@ -23,7 +24,15 @@ async function api(path: string, body?: unknown) {
   return value;
 }
 
-function PublicPreview({ profile, frames }: { profile: string; frames: any[] }) {
+function PublicPreview({
+  profile,
+  frames,
+  source = 'screen',
+}: {
+  profile: string;
+  frames: any[];
+  source?: string;
+}) {
   const ref = useRef<HTMLDivElement>(null),
     [visible, setVisible] = useState(false),
     [images, setImages] = useState<any[]>([]),
@@ -43,9 +52,9 @@ function PublicPreview({ profile, frames }: { profile: string; frames: any[] }) 
     const controller = new AbortController();
     let urls: string[] = [],
       active = true;
-    Promise.all(
+    Promise.allSettled(
       frames.slice(-6).map(async (f) => {
-        const r = await fetch('/api/social/preview/' + profile + '/' + f.id, {
+        const r = await fetch('/api/social/preview/' + profile + '/' + f.id + '?source=' + source, {
           signal: controller.signal,
           cache: 'no-store',
         });
@@ -58,7 +67,7 @@ function PublicPreview({ profile, frames }: { profile: string; frames: any[] }) 
       }),
     )
       .then((list) => {
-        if (active) setImages(list);
+        if (active) setImages(list.filter((r) => r.status === 'fulfilled').map((r) => r.value));
       })
       .catch(() => {
         if (active) setImages([]);
@@ -68,7 +77,7 @@ function PublicPreview({ profile, frames }: { profile: string; frames: any[] }) 
       controller.abort();
       urls.forEach(URL.revokeObjectURL);
     };
-  }, [profile, key, visible]);
+  }, [profile, key, visible, source]);
   useEffect(() => {
     if (!images.length || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const t = setInterval(() => {
@@ -178,7 +187,24 @@ export function Discover() {
                 {status(p.status)}
               </span>
             </div>
-            <PublicPreview profile={p.profile} frames={p.previews || []} />
+            <div className="public-media-stage">
+              <PublicPreview
+                key={p.screenMode}
+                profile={p.profile}
+                frames={p.screenMode === 'hidden' ? [] : p.previews || []}
+              />
+              {p.cameraMode !== 'hidden' && p.cameraMode && (
+                <div className="public-camera">
+                  <PublicPreview
+                    key={p.cameraMode}
+                    profile={p.profile}
+                    frames={p.previews || []}
+                    source="camera"
+                  />
+                </div>
+              )}
+            </div>
+            {p.software && <p className="public-software">{p.software}</p>}
             <div className="post-stats">
               <strong>{hours(p.session?.workMs || 0)}</strong>
               <span>
@@ -249,6 +275,7 @@ export default function Social({ profile }: { profile: string }) {
     [discoverable, setDiscoverable] = useState(false),
     [publicActivity, setPublicActivity] = useState(false),
     [publicPreview, setPublicPreview] = useState(false),
+    [sharing, setSharing] = useState(defaultSharing),
     [query, setQuery] = useState(''),
     [results, setResults] = useState<any[]>([]);
   const refresh = async () => {
@@ -266,6 +293,7 @@ export default function Social({ profile }: { profile: string }) {
           setDiscoverable(Boolean(r.me.discoverable));
           setPublicActivity(Boolean(r.me.public_activity));
           setPublicPreview(Boolean(r.me.public_preview));
+          setSharing(r.me.sharing || defaultSharing);
         }
       })
       .catch((e) => active && setError(e.message));
@@ -319,7 +347,15 @@ export default function Social({ profile }: { profile: string }) {
           className="social-settings"
           onSubmit={(e) => {
             e.preventDefault();
-            act(() => api('/profile', { name, discoverable, publicActivity, publicPreview }));
+            act(() =>
+              api('/profile', {
+                name,
+                discoverable,
+                publicActivity,
+                publicPreview: sharing.publicScreen !== 'hidden',
+                sharing,
+              }),
+            );
           }}
         >
           <h2>Mon profil dans le réseau</h2>
@@ -327,36 +363,15 @@ export default function Social({ profile }: { profile: string }) {
             Nom affiché
             <Input value={name} maxLength={60} required onChange={(e) => setName(e.target.value)} />
           </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={discoverable}
-              onChange={(e) => setDiscoverable(e.target.checked)}
-            />
-            Être trouvable par mon pseudo
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              disabled={!discoverable}
-              checked={discoverable && publicActivity}
-              onChange={(e) => setPublicActivity(e.target.checked)}
-            />
-            Publier mon statut et mes statistiques dans Découvrir et la Room, visibles par tous
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              disabled={!discoverable || !publicActivity}
-              checked={discoverable && publicActivity && publicPreview}
-              onChange={(e) => setPublicPreview(e.target.checked)}
-            />
-            Autoriser un aperçu public de 6 captures récentes, retardées d’au moins 5 minutes
-          </label>
-          <p>
-            Sans cette option, le fil affiche un aperçu privé sans vos images. Les règles de
-            masquage restent appliquées.
-          </p>
+          <SharingControls
+            value={{ sharing, discoverable, publicActivity }}
+            disabled={busy}
+            onChange={(v: any) => {
+              setSharing(v.sharing);
+              setDiscoverable(v.discoverable);
+              setPublicActivity(v.publicActivity);
+            }}
+          />
           <Button disabled={busy}>Enregistrer le profil</Button>
           {data?.blocks.length > 0 && (
             <div>
