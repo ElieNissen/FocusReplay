@@ -1,3 +1,4 @@
+import { Button } from '@heroui/react';
 import React, { useState } from 'react';
 import { Gift, Plus, Check, Pencil, Trash2, Coffee, ChevronLeft, ArrowRight } from 'lucide-react';
 import { duration } from './lib.mjs';
@@ -21,8 +22,10 @@ export function BreakBanner({ wallet, pauseTimer, clock, act, onResume }) {
               : 'Le temps prévu est écoulé. Reprenez quand vous êtes prêt.'}
         </small>
       </span>
-      <button
-        onClick={() =>
+      <Button
+        variant="tertiary"
+        type="submit"
+        onPress={() =>
           onResume
             ? onResume()
             : act(() =>
@@ -31,7 +34,7 @@ export function BreakBanner({ wallet, pauseTimer, clock, act, onResume }) {
         }
       >
         {pauseTimer ? 'Reprendre maintenant' : remaining ? 'Terminer la pause' : 'J’ai terminé'}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -46,26 +49,22 @@ export function Rewards({ data, clock, act, busy, onBack }) {
   const next = [...wallet.rewards].sort((a, b) => a.cost - b.cost).find((r) => r.cost > balance);
   return (
     <div className="settings-page rewards-page">
-      <button className="text-button" onClick={onBack}>
+      <Button variant="ghost" type="submit" className="text-button" onPress={onBack}>
         <ChevronLeft size={17} /> Retour au replay
-      </button>
+      </Button>
       <div className="page-heading">
         <div>
           <h1>Pauses & récompenses</h1>
         </div>
       </div>
-      <label className="setting-row">
-        <span>
-          <strong>Activer les récompenses</strong>
-        </span>
-        <Toggle
-          aria-label="Activer les récompenses"
-          className="toggle"
-          type="checkbox"
-          checked={settings.rewardsEnabled}
-          onChange={(e) => act(() => api.settings({ rewardsEnabled: e.target.checked }))}
-        />
-      </label>
+      <Toggle
+        label="Activer les récompenses"
+        aria-label="Activer les récompenses"
+        className="toggle"
+        type="checkbox"
+        checked={settings.rewardsEnabled}
+        onChange={(e) => act(() => api.settings({ rewardsEnabled: e.target.checked }))}
+      />
       <div className="wallet-line">
         <span className="wallet-icon">
           <Gift size={26} />
@@ -114,14 +113,16 @@ export function Rewards({ data, clock, act, busy, onBack }) {
       <section className="reward-section">
         <div className="section-title">
           <h2>À vous de choisir</h2>
-          <button
-            onClick={() => {
+          <Button
+            variant="tertiary"
+            type="submit"
+            onPress={() => {
               setEdit({ ...blank });
               setRedeem(null);
             }}
           >
             <Plus size={16} /> Ajouter
-          </button>
+          </Button>
         </div>
         <div className="reward-list">
           {wallet.rewards.map((r) => (
@@ -140,34 +141,40 @@ export function Rewards({ data, clock, act, busy, onBack }) {
                     : `${r.cost - balance} min de travail restantes`}
                 </small>
               </div>
-              <button
-                disabled={
+              <Button
+                variant="tertiary"
+                type="submit"
+                isDisabled={
                   !settings.rewardsEnabled ||
                   balance < r.cost ||
                   Boolean(wallet.activeBreak) ||
                   busy
                 }
-                onClick={() => {
+                onPress={() => {
                   setRedeem(r);
                   setEdit(null);
                 }}
               >
                 <Coffee size={15} /> En profiter
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                type="submit"
                 className="icon-button"
                 aria-label={`Modifier ${r.name}`}
-                onClick={() => setEdit({ ...r })}
+                onPress={() => setEdit({ ...r })}
               >
                 <Pencil size={16} />
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="ghost"
+                type="submit"
                 className="icon-button"
                 aria-label={`Supprimer ${r.name}`}
-                onClick={() => setRemove(r)}
+                onPress={() => setRemove(r)}
               >
                 <Trash2 size={16} />
-              </button>
+              </Button>
             </div>
           ))}
         </div>
@@ -178,11 +185,15 @@ export function Rewards({ data, clock, act, busy, onBack }) {
               Utiliser {redeem.cost} minutes de travail pour {redeem.minutes} minutes de «{' '}
               {redeem.name} » ? La session sera mise en pause.
             </span>
-            <button onClick={() => setRedeem(null)}>Annuler</button>
-            <button
+            <Button variant="tertiary" type="submit" onPress={() => setRedeem(null)}>
+              Annuler
+            </Button>
+            <Button
+              variant="primary"
+              type="submit"
               className="primary"
-              disabled={busy}
-              onClick={() =>
+              isDisabled={busy}
+              onPress={() =>
                 act(async () => {
                   await api.redeemReward(redeem.id);
                   setRedeem(null);
@@ -190,7 +201,7 @@ export function Rewards({ data, clock, act, busy, onBack }) {
               }
             >
               <Check size={15} /> Commencer la pause
-            </button>
+            </Button>
           </div>
         )}
         {remove && (
@@ -198,10 +209,14 @@ export function Rewards({ data, clock, act, busy, onBack }) {
             <span>
               Supprimer « {remove.name} » de vos récompenses ? Votre temps cumulé est conservé.
             </span>
-            <button onClick={() => setRemove(null)}>Garder</button>
-            <button
-              disabled={busy}
-              onClick={() =>
+            <Button variant="tertiary" type="submit" onPress={() => setRemove(null)}>
+              Garder
+            </Button>
+            <Button
+              variant="tertiary"
+              type="submit"
+              isDisabled={busy}
+              onPress={() =>
                 act(async () => {
                   await api.deleteReward(remove.id);
                   setRemove(null);
@@ -209,7 +224,7 @@ export function Rewards({ data, clock, act, busy, onBack }) {
               }
             >
               Supprimer
-            </button>
+            </Button>
           </div>
         )}
         {edit && (
@@ -265,12 +280,12 @@ export function Rewards({ data, clock, act, busy, onBack }) {
                   onChange={(e) => setEdit({ ...edit, cost: e.target.value })}
                 />
               </label>
-              <button type="button" onClick={() => setEdit(null)}>
+              <Button variant="tertiary" type="button" onPress={() => setEdit(null)}>
                 Annuler
-              </button>
-              <button className="primary" disabled={busy}>
+              </Button>
+              <Button variant="primary" type="submit" className="primary" isDisabled={busy}>
                 Enregistrer
-              </button>
+              </Button>
             </div>
           </form>
         )}

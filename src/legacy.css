@@ -59,17 +59,17 @@ body {
   color: var(--text);
   font-kerning: normal;
 }
-button,
+button:not(.button):not(.toggle-button),
 input,
 select {
   font: inherit;
 }
-button,
+button:not(.button):not(.toggle-button),
 select,
 input[type='date'] {
   min-height: 38px;
 }
-button {
+button:not(.button):not(.toggle-button) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -85,19 +85,19 @@ button {
     background 150ms ease-out,
     border-color 150ms ease-out;
 }
-button:hover {
+button:not(.button):not(.toggle-button):hover {
   background: var(--hover);
   border-color: var(--border-strong);
 }
-button:active {
+button:not(.button):not(.toggle-button):active {
   transform: translateY(1px);
 }
-button:disabled {
+button:not(.button):not(.toggle-button):disabled {
   opacity: 0.4;
   cursor: not-allowed;
   transform: none;
 }
-button:focus-visible,
+button:not(.button):not(.toggle-button):focus-visible,
 input:focus-visible,
 select:focus-visible {
   outline: 2px solid var(--accent);
@@ -313,7 +313,7 @@ strong {
   margin-top: auto;
   padding-top: 20px;
 }
-.sidebar-footer > button {
+.sidebar-footer > button:not(.button):not(.toggle-button) {
   width: 100%;
   justify-content: flex-start;
   background: transparent;
@@ -372,7 +372,7 @@ strong {
   display: flex;
   gap: 8px;
 }
-.session-actions button {
+.session-actions button:not(.button):not(.toggle-button) {
   font-size: 0.75rem;
   min-height: 34px;
   padding: 6px 10px;
@@ -396,7 +396,7 @@ strong {
   font-size: 0.79rem;
   margin-top: 7px;
 }
-.page-heading > button {
+.page-heading > button:not(.button):not(.toggle-button) {
   font-size: 0.78rem;
 }
 .replay-stage {
@@ -559,7 +559,7 @@ strong {
   width: 76px;
   padding: 4px;
 }
-.transport > button {
+.transport > button:not(.button):not(.toggle-button) {
   justify-self: end;
   font-size: 0.7rem;
   padding: 5px 9px;
@@ -591,7 +591,7 @@ strong {
   align-items: center;
 }
 .timeline-tools select,
-.timeline-tools button {
+.timeline-tools button:not(.button):not(.toggle-button) {
   font-size: 0.65rem;
   min-height: 26px;
   padding: 2px 6px;
@@ -865,7 +865,7 @@ strong {
   display: flex;
   gap: 8px;
 }
-.archive-actions button {
+.archive-actions button:not(.button):not(.toggle-button) {
   font-size: 0.65rem;
 }
 .empty-state {
@@ -938,7 +938,7 @@ strong {
 .notice > span {
   flex: 1;
 }
-.notice button {
+.notice button:not(.button):not(.toggle-button) {
   font-size: 0.73rem;
   min-height: 30px;
   padding: 4px 8px;
@@ -980,7 +980,7 @@ strong {
   font-size: 0.73rem;
   color: var(--muted);
 }
-.export-fields button {
+.export-fields button:not(.button):not(.toggle-button) {
   font-size: 0.78rem;
 }
 .settings-page {
@@ -1033,7 +1033,7 @@ strong {
   max-width: 260px;
   font-size: 0.78rem;
 }
-.setting-row button {
+.setting-row button:not(.button):not(.toggle-button) {
   font-size: 0.78rem;
 }
 .setting-row input[type='range'] {
@@ -1076,7 +1076,7 @@ strong {
   gap: 8px;
   padding: 12px 0;
 }
-.music-actions button {
+.music-actions button:not(.button):not(.toggle-button) {
   font-size: 0.75rem;
 }
 .privacy-stats {
@@ -1087,7 +1087,7 @@ strong {
   color: var(--muted);
   font-size: 0.78rem;
 }
-.privacy-stats button {
+.privacy-stats button:not(.button):not(.toggle-button) {
   font-size: 0.75rem;
 }
 .loading {
@@ -1128,7 +1128,7 @@ strong {
   display: block;
   font-size: 0.69rem;
 }
-.widget button {
+.widget button:not(.button):not(.toggle-button) {
   -webkit-app-region: no-drag;
 }
 @media (min-width: 1650px) {
@@ -1211,7 +1211,7 @@ strong {
   .start-button {
     white-space: normal;
   }
-  .session-actions button {
+  .session-actions button:not(.button):not(.toggle-button) {
     font-size: 0.67rem;
     padding: 5px 7px;
   }
@@ -1225,7 +1225,7 @@ strong {
     align-items: flex-start;
     gap: 10px;
   }
-  .page-heading > button {
+  .page-heading > button:not(.button):not(.toggle-button) {
     font-size: 0.68rem;
     padding: 7px;
   }
@@ -1235,7 +1235,7 @@ strong {
   .transport {
     grid-template-columns: 1fr auto;
   }
-  .transport > button {
+  .transport > button:not(.button):not(.toggle-button) {
     grid-column: 1 / -1;
     justify-self: end;
   }
@@ -1427,7 +1427,7 @@ strong {
   min-width: 48px;
   color: var(--muted);
 }
-.zoom-control button {
+.zoom-control button:not(.button):not(.toggle-button) {
   border: 0;
   padding: 4px;
   min-height: 26px;
@@ -1536,7 +1536,7 @@ strong {
   gap: 8px;
   font-size: 0.75rem;
 }
-.timeline-rule > button {
+.timeline-rule > button:not(.button):not(.toggle-button) {
   margin-left: auto;
 }
 .music-slot-options {
@@ -1549,7 +1549,7 @@ strong {
   flex-wrap: wrap;
   gap: 4px;
 }
-.choice-buttons button {
+.choice-buttons button:not(.button):not(.toggle-button) {
   border-color: transparent;
   background: transparent;
 }
@@ -1680,7 +1680,7 @@ strong {
   font-size: 12px;
   color: var(--muted);
 }
-.checkin-overlay header button {
+.checkin-overlay header button:not(.button):not(.toggle-button) {
   -webkit-app-region: no-drag;
   border: 0;
   padding: 5px;
@@ -1714,7 +1714,7 @@ strong {
   gap: 8px;
   margin-top: 12px;
 }
-.checkin-overlay footer button {
+.checkin-overlay footer button:not(.button):not(.toggle-button) {
   font-size: 11px;
   padding: 9px 8px;
 }
@@ -1724,7 +1724,7 @@ strong {
   gap: 5px;
   margin-top: 8px;
 }
-.checkin-reasons button {
+.checkin-reasons button:not(.button):not(.toggle-button) {
   font-size: 11px;
   padding: 5px 7px;
 }
@@ -1736,7 +1736,7 @@ strong {
   color: var(--muted);
   font-size: 12px;
 }
-.checkin-history > button {
+.checkin-history > button:not(.button):not(.toggle-button) {
   width: 100%;
   display: flex;
   align-items: start;
@@ -1773,19 +1773,19 @@ strong {
   background: var(--panel);
   color: var(--accent);
 }
-.checkin-overlay header button {
+.checkin-overlay header button:not(.button):not(.toggle-button) {
   background: transparent;
 }
-.checkin-reasons button {
+.checkin-reasons button:not(.button):not(.toggle-button) {
   min-height: 28px;
   background: var(--panel);
   border: 1px solid var(--border);
 }
-.checkin-overlay footer button {
+.checkin-overlay footer button:not(.button):not(.toggle-button) {
   font-size: 12px;
   min-height: 34px;
 }
-.checkin-overlay footer button:not(.primary) {
+.checkin-overlay footer button:not(.button):not(.toggle-button):not(.primary) {
   background: transparent;
   border: 1px solid var(--border);
 }
@@ -1894,7 +1894,7 @@ strong {
   width: 100%;
   gap: 6px;
 }
-.group-breakdown button {
+.group-breakdown button:not(.button):not(.toggle-button) {
   font-size: 12px;
 }
 .group-breakdown strong {
@@ -1989,7 +1989,7 @@ strong {
   gap: 8px;
   flex-wrap: wrap;
 }
-.profile-rules button {
+.profile-rules button:not(.button):not(.toggle-button) {
   gap: 8px;
 }
 .profile-caption {

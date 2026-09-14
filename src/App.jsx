@@ -1,4 +1,4 @@
-import { Button } from './Hero';
+import { Button } from '@heroui/react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Profile from './Profile';
 import SettingsView from './SettingsView';
@@ -60,9 +60,20 @@ import { useSoundDesign } from './sounds';
 const api = window.focusReplay;
 const imageUrl = (f) => (f ? `focusmedia://capture/${f.id}` : '');
 const sessionName = (s) => `Session de ${shortTime(s.startedAt)}`;
-function IconButton({ icon: Icon, label, ...props }) {
+function IconButton({ icon: Icon, label, disabled, onClick, ...props }) {
   return (
-    <Button className="icon-button" aria-label={label} title={label} {...props}>
+    <Button
+      isIconOnly
+      size="sm"
+      variant="ghost"
+      type="button"
+      className="icon-button"
+      aria-label={label}
+      title={label}
+      isDisabled={disabled}
+      onPress={onClick}
+      {...props}
+    >
       <Icon size={18} />
     </Button>
   );
@@ -365,11 +376,22 @@ export default function App() {
           <div className="widget-pause" aria-label="Choisir une pause">
             <div className="pause-presets">
               {[2, 5, 10, 15, 60].map((m) => (
-                <Button key={m} disabled={busy} onClick={() => takePause(m)}>
+                <Button
+                  variant="tertiary"
+                  type="submit"
+                  key={m}
+                  isDisabled={busy}
+                  onPress={() => takePause(m)}
+                >
                   {m === 60 ? '1 h' : m + ' min'}
                 </Button>
               ))}
-              <Button disabled={busy} onClick={() => takePause(null)}>
+              <Button
+                variant="tertiary"
+                type="submit"
+                isDisabled={busy}
+                onPress={() => takePause(null)}
+              >
                 Sans limite
               </Button>
             </div>
@@ -390,7 +412,9 @@ export default function App() {
                 onChange={(e) => setPauseMinutes(e.target.value)}
               />
               <span>min</span>
-              <Button disabled={busy}>Pause</Button>
+              <Button variant="tertiary" type="submit" isDisabled={busy}>
+                Pause
+              </Button>
             </form>
             <div className="widget-pause-footer">
               <small>
@@ -439,8 +463,10 @@ export default function App() {
           />
         </label>
         <Button
+          variant="ghost"
+          type="submit"
           className={`day-button ${!selectedSession && view === 'replay' ? 'selected' : ''}`}
-          onClick={() => chooseSession(null)}
+          onPress={() => chooseSession(null)}
         >
           <span>
             <Film size={17} /> Toute la journée
@@ -452,9 +478,11 @@ export default function App() {
         <nav className="session-list" aria-label="Sessions">
           {sessions.map((s) => (
             <Button
+              variant="ghost"
+              type="submit"
               key={s.id}
               className={`session-row ${selectedSession === s.id && view === 'replay' ? 'selected' : ''}`}
-              onClick={() => chooseSession(s.id)}
+              onPress={() => chooseSession(s.id)}
             >
               <div>
                 <span>{sessionName(s)}</span>
@@ -471,8 +499,10 @@ export default function App() {
         </nav>
         <footer className="sidebar-footer">
           <Button
+            variant="tertiary"
+            type="submit"
             className={view === 'profile' ? 'selected' : ''}
-            onClick={() => {
+            onPress={() => {
               setView('profile');
               setPlaying(false);
             }}
@@ -480,8 +510,10 @@ export default function App() {
             <Activity size={17} /> Profil
           </Button>
           <Button
+            variant="tertiary"
+            type="submit"
             className={view === 'rewards' ? 'selected' : ''}
-            onClick={() => {
+            onPress={() => {
               setView('rewards');
               setPlaying(false);
             }}
@@ -489,8 +521,10 @@ export default function App() {
             <Gift size={17} /> Pauses & récompenses
           </Button>
           <Button
+            variant="tertiary"
+            type="submit"
             className={view === 'settings' ? 'selected' : ''}
-            onClick={() => {
+            onPress={() => {
               setView('settings');
               setPlaying(false);
             }}
@@ -533,28 +567,38 @@ export default function App() {
               </span>
             )}
             {musicPlaying && (
-              <Button onClick={stopMusic}>
+              <Button variant="tertiary" type="submit" onPress={stopMusic}>
                 <Volume2 size={16} /> Couper la musique
               </Button>
             )}
             {!active && (
-              <Button className="primary" disabled={busy} onClick={begin}>
+              <Button
+                variant="primary"
+                type="submit"
+                className="primary"
+                isDisabled={busy}
+                onPress={begin}
+              >
                 <Play size={16} /> Commencer une session
               </Button>
             )}
             {active && (
               <>
                 <Button
-                  disabled={busy || data.systemPaused}
-                  onClick={() => (paused ? resume() : setPauseMenu((p) => !p))}
+                  variant="tertiary"
+                  type="submit"
+                  isDisabled={busy || data.systemPaused}
+                  onPress={() => (paused ? resume() : setPauseMenu((p) => !p))}
                 >
                   {paused ? <Play size={16} /> : <Pause size={16} />}{' '}
                   {paused ? 'Reprendre' : 'Pause'}
                 </Button>
                 <Button
+                  variant="tertiary"
+                  type="submit"
                   className="stop-button"
-                  disabled={busy}
-                  onClick={() => act(() => api.stop())}
+                  isDisabled={busy}
+                  onPress={() => act(() => api.stop())}
                 >
                   <Square size={13} fill="currentColor" /> Terminer
                 </Button>
@@ -579,8 +623,10 @@ export default function App() {
               <div className="pause-presets">
                 {[2, 5, 10, 15, 60].map((minutes) => (
                   <Button
+                    variant="tertiary"
+                    type="submit"
                     key={minutes}
-                    onClick={() =>
+                    onPress={() =>
                       act(async () => {
                         await api.pauseFor(minutes);
                         setPauseMenu(false);
@@ -591,7 +637,9 @@ export default function App() {
                   </Button>
                 ))}
                 <Button
-                  onClick={() =>
+                  variant="tertiary"
+                  type="submit"
+                  onPress={() =>
                     act(async () => {
                       await api.pauseFor(null);
                       setPauseMenu(false);
@@ -624,7 +672,9 @@ export default function App() {
                   />{' '}
                   min
                 </label>
-                <Button type="submit">Commencer cette pause</Button>
+                <Button variant="tertiary" type="submit">
+                  Commencer cette pause
+                </Button>
               </form>
               <p className="hint">Son et notification à la fin. La reprise reste manuelle.</p>
             </section>
@@ -650,7 +700,9 @@ export default function App() {
           <div className="notice" role="status">
             <Music2 size={17} />
             <span>{musicStatus.error}</span>
-            <Button onClick={() => setView('settings')}>Musique</Button>
+            <Button variant="tertiary" type="submit" onPress={() => setView('settings')}>
+              Musique
+            </Button>
           </div>
         )}
         {data.cameraWarning && settings.cameraEnabled && active && (
@@ -694,8 +746,10 @@ export default function App() {
                 </h1>
               </div>
               <Button
-                disabled={!frames.length || exportState?.status === 'running' || busy}
-                onClick={() =>
+                variant="tertiary"
+                type="submit"
+                isDisabled={!frames.length || exportState?.status === 'running' || busy}
+                onPress={() =>
                   act(() =>
                     api.export({
                       day,
@@ -720,13 +774,15 @@ export default function App() {
                     <Download size={18} />
                     <span>Création du replay · {exportState.progress} %</span>
                     <progress max="100" value={exportState.progress} />
-                    <Button onClick={() => api.cancelExport()}>Annuler</Button>
+                    <Button variant="tertiary" type="submit" onPress={() => api.cancelExport()}>
+                      Annuler
+                    </Button>
                   </>
                 ) : exportState.status === 'done' ? (
                   <>
                     <Check size={18} />
                     <span>Vidéo prête : {exportState.name}</span>
-                    <Button onClick={() => api.openExport()}>
+                    <Button variant="tertiary" type="submit" onPress={() => api.openExport()}>
                       <FolderOpen size={16} /> Voir le fichier
                     </Button>
                   </>
@@ -748,7 +804,13 @@ export default function App() {
                 </div>
                 <p>{active ? 'Première capture…' : 'Aucune capture'}</p>
                 {!active && (
-                  <Button className="primary large" onClick={begin} disabled={busy}>
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    className="primary large"
+                    onPress={begin}
+                    isDisabled={busy}
+                  >
                     <Play size={17} fill="currentColor" /> Commencer
                   </Button>
                 )}
@@ -757,10 +819,12 @@ export default function App() {
               <>
                 <section className="replay-stage" aria-label="Prévisualisation de la capture">
                   <Button
+                    variant="tertiary"
+                    type="submit"
                     className="preview-privacy-action"
-                    disabled={busy}
+                    isDisabled={busy}
                     title={(current.privacyReasons || []).join(' · ')}
-                    onClick={() =>
+                    onPress={() =>
                       current.private
                         ? act(() => api.shareMask(current.id, false))
                         : current.sharedPrivate
@@ -838,9 +902,11 @@ export default function App() {
                       onClick={() => step(-1)}
                     />
                     <Button
+                      variant="primary"
+                      type="submit"
                       className="play-button"
                       aria-label={playing ? 'Arrêter la lecture' : 'Lire le replay'}
-                      onClick={togglePlay}
+                      onPress={togglePlay}
                     >
                       {playing ? (
                         <Pause size={20} fill="currentColor" />
@@ -959,11 +1025,21 @@ export default function App() {
             {frames.length > 0 && (
               <div className="archive-actions">
                 <div>
-                  <Button className="text-button" onClick={() => setConfirmDelete('frame')}>
+                  <Button
+                    variant="ghost"
+                    type="submit"
+                    className="text-button"
+                    onPress={() => setConfirmDelete('frame')}
+                  >
                     <Trash2 size={14} /> Supprimer cette capture
                   </Button>
                   {selected?.endedAt && (
-                    <Button className="text-button" onClick={() => setConfirmDelete('session')}>
+                    <Button
+                      variant="ghost"
+                      type="submit"
+                      className="text-button"
+                      onPress={() => setConfirmDelete('session')}
+                    >
                       Supprimer la session
                     </Button>
                   )}
@@ -977,11 +1053,15 @@ export default function App() {
                   {confirmDelete === 'frame' ? 'cette capture' : 'cette session et ses captures'}{' '}
                   définitivement ?
                 </span>
-                <Button onClick={() => setConfirmDelete(null)}>Garder</Button>
+                <Button variant="tertiary" type="submit" onPress={() => setConfirmDelete(null)}>
+                  Garder
+                </Button>
                 <Button
+                  variant="danger"
+                  type="submit"
                   className="danger"
-                  disabled={busy}
-                  onClick={() =>
+                  isDisabled={busy}
+                  onPress={() =>
                     act(async () => {
                       if (confirmDelete === 'frame') await api.deleteFrame(current.id);
                       else {

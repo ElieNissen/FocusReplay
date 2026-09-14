@@ -1,3 +1,4 @@
+import { Button } from '@heroui/react';
 import React, { useEffect, useRef, useState } from 'react';
 import { Music2, Play, Square, Plus, X, Search, ExternalLink } from 'lucide-react';
 import { Toggle } from './Toggle';
@@ -21,23 +22,27 @@ function TrackRow({ item, action, label, disabled }) {
         <strong>{item.name}</strong>
         <small>{item.subtitle}</small>
       </div>
-      <button
+      <Button
+        variant="ghost"
+        type="submit"
         className="icon-button"
         title="Ouvrir dans Spotify"
         aria-label={'Ouvrir dans Spotify · ' + item.name}
-        onClick={() => api.spotifyOpen(item.uri)}
+        onPress={() => api.spotifyOpen(item.uri)}
       >
         <ExternalLink size={14} />
-      </button>
-      <button
+      </Button>
+      <Button
+        variant="ghost"
+        type="submit"
         className="icon-button"
         aria-label={label + ' · ' + item.name}
         title={label}
-        disabled={disabled}
-        onClick={action}
+        isDisabled={disabled}
+        onPress={action}
       >
         {label === 'Retirer' ? <X size={16} /> : <Plus size={16} />}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -85,9 +90,14 @@ function Picker({ mode, items, choose, connected, phase }) {
       {mode === 'playlist' ? (
         <div className="picker-heading">
           Mes playlists{' '}
-          <button disabled={!connected || loading} onClick={() => load()}>
+          <Button
+            variant="tertiary"
+            type="submit"
+            isDisabled={!connected || loading}
+            onPress={() => load()}
+          >
             Actualiser
-          </button>
+          </Button>
         </div>
       ) : (
         <label className="music-search">
@@ -121,12 +131,14 @@ function Picker({ mode, items, choose, connected, phase }) {
           (mode === 'playlist' || query.trim().length >= 2) && <small>Aucun résultat.</small>}
       </div>
       {more && (
-        <button
-          disabled={loading}
-          onClick={() => load(page.current + (mode === 'playlist' ? 50 : 10))}
+        <Button
+          variant="tertiary"
+          type="submit"
+          isDisabled={loading}
+          onPress={() => load(page.current + (mode === 'playlist' ? 50 : 10))}
         >
           Afficher plus
-        </button>
+        </Button>
       )}
       <details>
         <summary>Ajouter avec un lien Spotify</summary>
@@ -154,7 +166,9 @@ function Picker({ mode, items, choose, connected, phase }) {
             placeholder="Lien Spotify"
             required
           />
-          <button disabled={!connected}>Ajouter</button>
+          <Button variant="tertiary" type="submit" isDisabled={!connected}>
+            Ajouter
+          </Button>
         </form>
       </details>
     </div>
@@ -194,53 +208,62 @@ function Slot({ phase, slot, save, busy, audio, connected, status, act }) {
   const playing = status?.playing && status.phase === phase;
   return (
     <div className="music-slot">
-      <label className="setting-row">
-        <strong>{names[phase]}</strong>
-        <Toggle
-          className="toggle"
-          checked={slot.enabled}
-          disabled={busy}
-          onChange={(e) => save({ ...slot, enabled: e.target.checked })}
-        />
-      </label>
+      <Toggle
+        label={names[phase]}
+        className="toggle"
+        checked={slot.enabled}
+        disabled={busy}
+        onChange={(e) => save({ ...slot, enabled: e.target.checked })}
+      />
       {slot.enabled && (
         <div className="music-slot-options">
           <div className="music-options-row">
             <div className="choice-buttons" role="group" aria-label={'Source · ' + names[phase]}>
               {['local', 'spotify'].map((source) => (
-                <button
+                <Button
+                  variant="tertiary"
+                  type="submit"
                   key={source}
                   aria-pressed={draft.source === source}
-                  onClick={() => update({ source })}
+                  onPress={() => update({ source })}
                 >
                   {source === 'local' ? 'MP3' : 'Spotify'}
-                </button>
+                </Button>
               ))}
             </div>
-            <button
-              disabled={busy || dirty || (draft.source === 'local' ? !audio : !items.length)}
+            <Button
+              variant="tertiary"
+              type="submit"
+              isDisabled={busy || dirty || (draft.source === 'local' ? !audio : !items.length)}
               aria-label={'Écouter · ' + names[phase]}
-              onClick={() => act(() => (playing ? api.musicStop() : api.musicPreview(phase)))}
+              onPress={() => act(() => (playing ? api.musicStop() : api.musicPreview(phase)))}
             >
               {playing ? <Square size={15} /> : <Play size={15} />}
               {playing ? 'Arrêter' : 'Écouter'}
-            </button>
+            </Button>
           </div>
           {draft.source === 'local' ? (
             <div className="local-track">
               <Music2 size={20} />
               <span>{audio?.name || 'Aucun MP3'}</span>
-              <button disabled={busy} onClick={() => act(() => api.pickMusic(phase))}>
+              <Button
+                variant="tertiary"
+                type="submit"
+                isDisabled={busy}
+                onPress={() => act(() => api.pickMusic(phase))}
+              >
                 {audio ? 'Remplacer' : 'Choisir un MP3'}
-              </button>
+              </Button>
               {audio && (
-                <button
+                <Button
+                  variant="ghost"
+                  type="submit"
                   className="icon-button"
                   aria-label={'Retirer le MP3 · ' + names[phase]}
-                  onClick={() => act(() => api.removeMusic(phase))}
+                  onPress={() => act(() => api.removeMusic(phase))}
                 >
                   <X size={16} />
-                </button>
+                </Button>
               )}
             </div>
           ) : (
@@ -251,13 +274,15 @@ function Slot({ phase, slot, save, busy, audio, connected, status, act }) {
                   ['selection', 'Titres aléatoires'],
                   ['playlist', 'Une playlist'],
                 ].map(([mode, label]) => (
-                  <button
+                  <Button
+                    variant="tertiary"
+                    type="submit"
                     key={mode}
                     aria-pressed={draft.mode === mode}
-                    onClick={() => update({ mode, links: '', items: [] })}
+                    onPress={() => update({ mode, links: '', items: [] })}
                   >
                     {label}
-                  </button>
+                  </Button>
                 ))}
               </div>
               <div className="selected-tracks">
@@ -281,17 +306,25 @@ function Slot({ phase, slot, save, busy, audio, connected, status, act }) {
           )}
           {dirty && (
             <div className="music-options-row">
-              <button className="primary" disabled={busy} onClick={() => save(draft)}>
+              <Button
+                variant="primary"
+                type="submit"
+                className="primary"
+                isDisabled={busy}
+                onPress={() => save(draft)}
+              >
                 Enregistrer
-              </button>
-              <button
-                onClick={() => {
+              </Button>
+              <Button
+                variant="tertiary"
+                type="submit"
+                onPress={() => {
                   setDraft(slot);
                   setDirty(false);
                 }}
               >
                 Annuler
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -348,14 +381,27 @@ export default function MusicSettings({ settings, data, act, busy, status }) {
                 </option>
               ))}
             </select>
-            <button onClick={refresh}>Actualiser</button>
-            <button onClick={() => act(() => api.spotifyDisconnect())}>Déconnecter</button>
+            <Button variant="tertiary" type="submit" onPress={refresh}>
+              Actualiser
+            </Button>
+            <Button
+              variant="tertiary"
+              type="submit"
+              onPress={() => act(() => api.spotifyDisconnect())}
+            >
+              Déconnecter
+            </Button>
           </div>
         )}
         {status?.spotify?.connected && status?.spotify?.canReconnect && (
-          <button disabled={connecting} onClick={() => connect()}>
+          <Button
+            variant="tertiary"
+            type="submit"
+            isDisabled={connecting}
+            onPress={() => connect()}
+          >
             Actualiser les autorisations
-          </button>
+          </Button>
         )}
         {
           <details open={!status?.spotify?.connected}>
@@ -363,16 +409,23 @@ export default function MusicSettings({ settings, data, act, busy, status }) {
             <p>Créez votre application Spotify et ajoutez cette adresse de redirection :</p>
             <code>{status?.spotify?.redirect}</code>
             <div className="music-options-row">
-              <button onClick={() => api.spotifySetup()}>Spotify Developers</button>
+              <Button variant="tertiary" type="submit" onPress={() => api.spotifySetup()}>
+                Spotify Developers
+              </Button>
               <input
                 aria-label="Spotify Client ID"
                 placeholder="Client ID"
                 value={clientId}
                 onChange={(e) => setClient(e.target.value)}
               />
-              <button disabled={connecting || !clientId.trim()} onClick={() => connect(clientId)}>
+              <Button
+                variant="tertiary"
+                type="submit"
+                isDisabled={connecting || !clientId.trim()}
+                onPress={() => connect(clientId)}
+              >
                 Se connecter
-              </button>
+              </Button>
             </div>
           </details>
         }
@@ -383,13 +436,20 @@ export default function MusicSettings({ settings, data, act, busy, status }) {
               Réservé aux comptes ajoutés par FocusReplay dans Spotify Developers (5 comptes
               maximum).
             </p>
-            <button disabled={connecting} onClick={() => connect()}>
+            <Button
+              variant="tertiary"
+              type="submit"
+              isDisabled={connecting}
+              onPress={() => connect()}
+            >
               Se connecter avec une invitation
-            </button>
+            </Button>
           </details>
         )}
         {connecting && (
-          <button onClick={() => api.spotifyDisconnect()}>Annuler la connexion</button>
+          <Button variant="tertiary" type="submit" onPress={() => api.spotifyDisconnect()}>
+            Annuler la connexion
+          </Button>
         )}
         {connectionError && <p role="alert">{connectionError}</p>}
       </details>

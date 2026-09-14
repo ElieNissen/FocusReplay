@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@heroui/react';
 import { Input } from '@/components/ui/input';
 import { ArrowRight, UserRound } from 'lucide-react';
 import Social, { Discover } from './social';
@@ -96,7 +96,7 @@ export default function AccountHome() {
           value={visitor}
           onChange={(e) => setVisitor(e.target.value.toLowerCase())}
         />
-        <Button variant="outline" aria-label="Ouvrir le profil">
+        <Button type="submit" variant="outline" aria-label="Ouvrir le profil">
           <ArrowRight size={18} />
         </Button>
       </div>
@@ -126,9 +126,10 @@ export default function AccountHome() {
         <section className="account-welcome social-welcome">
           <Social profile={account.profile} />
           <Button
+            type="submit"
             variant="ghost"
-            disabled={busy}
-            onClick={async () => {
+            isDisabled={busy}
+            onPress={async () => {
               setBusy(true);
               setError('');
               try {
@@ -201,14 +202,15 @@ export default function AccountHome() {
                   />
                 </>
               )}
-              <Button disabled={busy || inviteRequired === null}>
+              <Button variant="primary" type="submit" isDisabled={busy || inviteRequired === null}>
                 {busy ? 'Connexion…' : register ? 'Créer mon compte' : 'Se connecter'}
               </Button>
             </form>
             <Button
+              type="submit"
               variant="ghost"
-              disabled={busy}
-              onClick={() => {
+              isDisabled={busy}
+              onPress={() => {
                 setRegister(!register);
                 setError('');
                 setPassword('');
@@ -228,4 +230,3 @@ export default function AccountHome() {
     </main>
   );
 }
-

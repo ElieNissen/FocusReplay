@@ -1,16 +1,24 @@
 import React, { useState } from 'react';
-export function Toggle({ checked, onChange, disabled, ...props }) {
+import { Switch, Label } from '@heroui/react';
+export function Toggle({ checked, onChange, disabled, label, className, type, ...props }) {
   const [optimistic, setOptimistic] = useState(null);
   return (
-    <input
+    <Switch
       {...props}
-      type="checkbox"
-      checked={optimistic ?? checked}
-      disabled={disabled || optimistic !== null}
-      onChange={(e) => {
-        setOptimistic(e.target.checked);
-        Promise.resolve(onChange(e)).finally(() => setOptimistic(null));
+      className="setting-switch"
+      isSelected={optimistic ?? checked}
+      isDisabled={disabled || optimistic !== null}
+      onChange={(checked) => {
+        setOptimistic(checked);
+        Promise.resolve(onChange({ target: { checked } })).finally(() => setOptimistic(null));
       }}
-    />
+    >
+      <Switch.Content>
+        <Switch.Control>
+          <Switch.Thumb />
+        </Switch.Control>
+        <Label>{label}</Label>
+      </Switch.Content>
+    </Switch>
   );
 }

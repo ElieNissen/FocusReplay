@@ -2,9 +2,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { Chip } from '@heroui/react';
 import { replayGroups } from '@/lib/replay-layout';
-import { Button } from '@/components/ui/button';
+import { Button } from '@heroui/react';
 import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
+import { Slider } from '@heroui/react';
 import AccountHome from '@/components/account-home';
 import { Lock, Play, Pause, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 const time = (at: number) =>
@@ -198,7 +198,9 @@ function Replay({ profile }: { profile: string }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          <Button disabled={busy}>Accéder au replay</Button>
+          <Button variant="tertiary" type="submit" isDisabled={busy}>
+            Accéder au replay
+          </Button>
         </form>
         <a href="/">Se connecter à mon compte</a>
         {error && <p role="alert">{error}</p>}
@@ -233,8 +235,9 @@ function Replay({ profile }: { profile: string }) {
           {data?.syncedAt > 0 && <small>Mis à jour à {time(data.syncedAt)}</small>}
         </div>
         <Button
+          type="submit"
           variant="ghost"
-          onClick={async () => {
+          onPress={async () => {
             await fetch(apiPath('/logout'), { method: 'POST' });
             await fetch('/api/account/logout', { method: 'POST' });
             setData(null);
@@ -265,8 +268,9 @@ function Replay({ profile }: { profile: string }) {
       </section>
       <nav className="days">
         <Button
-          variant={!day ? 'default' : 'outline'}
-          onClick={() => {
+          type="submit"
+          variant={!day ? 'primary' : 'outline'}
+          onPress={() => {
             setDay('');
             setFollow(true);
           }}
@@ -275,9 +279,10 @@ function Replay({ profile }: { profile: string }) {
         </Button>
         {[...new Set((data?.frames || []).map((f: any) => f.day))].reverse().map((d: any) => (
           <Button
+            type="submit"
             key={d}
-            variant={day === d ? 'default' : 'outline'}
-            onClick={() => {
+            variant={day === d ? 'primary' : 'outline'}
+            onPress={() => {
               setDay(d);
               setFollow(false);
               setCursor(null);
@@ -341,12 +346,19 @@ function Replay({ profile }: { profile: string }) {
               {time(position)} · {frame.private ? 'Données privées' : frame.app}
             </span>
             <div>
-              <Button variant="ghost" aria-label="Image précédente" onClick={() => step(-1)}>
+              <Button
+                type="submit"
+                variant="ghost"
+                aria-label="Image précédente"
+                onPress={() => step(-1)}
+              >
                 <ChevronLeft />
               </Button>
               <Button
+                variant="tertiary"
+                type="submit"
                 aria-label={playing ? 'Pause du replay' : 'Lire le replay'}
-                onClick={() => {
+                onPress={() => {
                   setFollow(false);
                   if (index === frames.length - 1) setCursor(frames[0].at);
                   setPlaying(!playing);
@@ -354,13 +366,19 @@ function Replay({ profile }: { profile: string }) {
               >
                 {playing ? <Pause /> : <Play />}
               </Button>
-              <Button variant="ghost" aria-label="Image suivante" onClick={() => step(1)}>
+              <Button
+                type="submit"
+                variant="ghost"
+                aria-label="Image suivante"
+                onPress={() => step(1)}
+              >
                 <ChevronRight />
               </Button>
             </div>
             <Button
-              variant={follow ? 'default' : 'outline'}
-              onClick={() => {
+              type="submit"
+              variant={follow ? 'primary' : 'outline'}
+              onPress={() => {
                 setFollow(true);
                 setPlaying(false);
               }}
@@ -373,23 +391,33 @@ function Replay({ profile }: { profile: string }) {
               Lecture · {speed} img/s
               <Slider
                 aria-label="Vitesse de lecture"
-                min={1}
-                max={8}
+                minValue={1}
+                maxValue={8}
                 step={1}
-                value={[speed]}
-                onValueChange={([v]) => setSpeed(v)}
-              />
+                value={speed}
+                onChange={(v) => setSpeed(Array.isArray(v) ? v[0] : v)}
+              >
+                <Slider.Track>
+                  <Slider.Fill />
+                  <Slider.Thumb />
+                </Slider.Track>
+              </Slider>
             </label>
             <label>
               Zoom · ×{zoom.toFixed(1)}
               <Slider
                 aria-label="Zoom de la timeline"
-                min={1}
-                max={8}
+                minValue={1}
+                maxValue={8}
                 step={0.25}
-                value={[zoom]}
-                onValueChange={([v]) => setZoom(v)}
-              />
+                value={zoom}
+                onChange={(v) => setZoom(Array.isArray(v) ? v[0] : v)}
+              >
+                <Slider.Track>
+                  <Slider.Fill />
+                  <Slider.Thumb />
+                </Slider.Track>
+              </Slider>
             </label>
             <small>
               {frame.at ? 'Capture du ' + new Date(frame.at).toLocaleString('fr-FR') : ''}
@@ -399,15 +427,20 @@ function Replay({ profile }: { profile: string }) {
             <div className="replay-timeline-content" style={{ width: zoom * 100 + '%' }}>
               <Slider
                 aria-label="Timeline du replay"
-                min={frames[0].at}
-                max={Math.max(frames[0].at + 1, frames.at(-1).at)}
-                value={[position]}
-                onValueChange={([value]) => {
-                  setCursor(value);
+                minValue={frames[0].at}
+                maxValue={Math.max(frames[0].at + 1, frames.at(-1).at)}
+                value={position}
+                onChange={(value) => {
+                  setCursor(Array.isArray(value) ? value[0] : value);
                   setFollow(false);
                   setPlaying(false);
                 }}
-              />
+              >
+                <Slider.Track>
+                  <Slider.Fill />
+                  <Slider.Thumb />
+                </Slider.Track>
+              </Slider>
               <div className="software-track" aria-label="Logiciels utilisés">
                 {replayGroups(data.overview || [], frames[0].at, frames.at(-1).at, zoom).map(
                   (a: any) => (

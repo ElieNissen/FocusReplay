@@ -49,10 +49,10 @@ export function SharingControls({ value, onChange, disabled = false }) {
         onChange={(v) => onChange({ ...value, discoverable: v })}
         isDisabled={disabled}
       >
-        <Switch.Control>
-          <Switch.Thumb />
-        </Switch.Control>
         <Switch.Content>
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
           <Label>Être trouvable par mon pseudo</Label>
         </Switch.Content>
       </Switch>
@@ -63,10 +63,10 @@ export function SharingControls({ value, onChange, disabled = false }) {
         }
         isDisabled={disabled}
       >
-        <Switch.Control>
-          <Switch.Thumb />
-        </Switch.Control>
         <Switch.Content>
+          <Switch.Control>
+            <Switch.Thumb />
+          </Switch.Control>
           <Label>Apparaître dans le fil et la Room avec mon activité</Label>
         </Switch.Content>
       </Switch>
@@ -92,10 +92,10 @@ export function SharingControls({ value, onChange, disabled = false }) {
           onChange={(v) => change('publicSoftware', v)}
           isDisabled={disabled || !value.publicActivity}
         >
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
           <Switch.Content>
+            <Switch.Control>
+              <Switch.Thumb />
+            </Switch.Control>
             <Label>Afficher mon logiciel en cours publiquement</Label>
           </Switch.Content>
         </Switch>

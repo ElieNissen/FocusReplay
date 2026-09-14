@@ -32,3 +32,5 @@ Thumbs.db
 *.pfx
 share-auth.bin*
 *.connection.json
+# heroui-agents-md
+.heroui-docs/

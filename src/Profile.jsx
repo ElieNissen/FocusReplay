@@ -1,4 +1,4 @@
-import { Button } from './Hero';
+import { Button } from '@heroui/react';
 import React, { useState, useEffect } from 'react';
 import { Chip } from '@heroui/react';
 import { SharingControls, defaultSharing } from './SharingControls';
@@ -62,13 +62,19 @@ export default function Profile({ data, busy, act, onBack }) {
   };
   return (
     <section className="settings-page profile-page">
-      <Button className="text-button" onClick={onBack}>
+      <Button variant="ghost" type="submit" className="text-button" onPress={onBack}>
         <ChevronLeft size={17} /> Retour au replay
       </Button>
       <div className="page-heading">
         <h1>Profil</h1>
       </div>
-      <Button className="text-button" disabled={busy} onClick={() => act(() => api.shareBrowse())}>
+      <Button
+        variant="ghost"
+        type="submit"
+        className="text-button"
+        isDisabled={busy}
+        onPress={() => act(() => api.shareBrowse())}
+      >
         <ExternalLink size={16} /> Consulter un profil sans compte
       </Button>
       <section className="profile-activity">
@@ -120,10 +126,20 @@ export default function Profile({ data, busy, act, onBack }) {
             }}
           >
             <div className="profile-row">
-              <Button type="button" aria-pressed={!register} onClick={() => setRegister(false)}>
+              <Button
+                variant="tertiary"
+                type="button"
+                aria-pressed={!register}
+                onPress={() => setRegister(false)}
+              >
                 Se connecter
               </Button>
-              <Button type="button" aria-pressed={register} onClick={() => setRegister(true)}>
+              <Button
+                variant="tertiary"
+                type="button"
+                aria-pressed={register}
+                onPress={() => setRegister(true)}
+              >
                 Créer mon compte
               </Button>
             </div>
@@ -187,9 +203,10 @@ export default function Profile({ data, busy, act, onBack }) {
                 />
               </label>
               <Button
+                variant="ghost"
                 type="button"
                 className="text-button"
-                onClick={() => {
+                onPress={() => {
                   setAddress(commonServer);
                   setInvitation('');
                 }}
@@ -197,11 +214,11 @@ export default function Profile({ data, busy, act, onBack }) {
                 Utiliser FocusReplay
               </Button>
             </details>
-            <Button className="primary" disabled={busy}>
+            <Button variant="primary" type="submit" className="primary" isDisabled={busy}>
               {busy ? 'Connexion…' : register ? 'Créer mon compte' : 'Se connecter'}
             </Button>
             {share.connected && (
-              <Button type="button" onClick={() => setConnecting(false)}>
+              <Button variant="tertiary" type="button" onPress={() => setConnecting(false)}>
                 Annuler
               </Button>
             )}
@@ -209,7 +226,12 @@ export default function Profile({ data, busy, act, onBack }) {
         ) : (
           <>
             <div className="profile-row">
-              <Button className="text-button" onClick={() => api.shareOpen()}>
+              <Button
+                variant="ghost"
+                type="submit"
+                className="text-button"
+                onPress={() => api.shareOpen()}
+              >
                 <ExternalLink size={16} /> Ouvrir mon profil en ligne
               </Button>
               <span>
@@ -243,21 +265,29 @@ export default function Profile({ data, busy, act, onBack }) {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </label>
-              <Button disabled={busy || password.length < 12}>
+              <Button variant="tertiary" type="submit" isDisabled={busy || password.length < 12}>
                 {share.configured ? 'Changer' : 'Enregistrer'}
               </Button>
             </form>
             {share.configured && (
               <Button
+                variant="primary"
+                type="submit"
                 className={share.enabled ? '' : 'primary'}
-                disabled={busy}
-                onClick={() => act(() => api.shareEnable(!share.enabled))}
+                isDisabled={busy}
+                onPress={() => act(() => api.shareEnable(!share.enabled))}
               >
                 {share.enabled ? 'Arrêter et retirer le replay en ligne' : 'Activer le partage'}
               </Button>
             )}
             {!share.enabled && (
-              <Button className="text-button" disabled={busy} onClick={() => setConnecting(true)}>
+              <Button
+                variant="ghost"
+                type="submit"
+                className="text-button"
+                isDisabled={busy}
+                onPress={() => setConnecting(true)}
+              >
                 Changer de connexion
               </Button>
             )}
@@ -287,7 +317,7 @@ export default function Profile({ data, busy, act, onBack }) {
                   }}
                   disabled={busy}
                 />
-                <Button className="primary" disabled={busy}>
+                <Button variant="primary" type="submit" className="primary" isDisabled={busy}>
                   Enregistrer le partage
                 </Button>
                 {saved && (
@@ -359,9 +389,10 @@ export default function Profile({ data, busy, act, onBack }) {
                       {automatic ? 'Protection automatique' : masked ? 'Masqué' : 'Autorisé'}
                     </Chip>
                     <Button
+                      variant="tertiary"
                       type="button"
-                      disabled={busy || automatic}
-                      onClick={() =>
+                      isDisabled={busy || automatic}
+                      onPress={() =>
                         update(
                           key,
                           masked
@@ -389,9 +420,10 @@ export default function Profile({ data, busy, act, onBack }) {
                     {new Date(f.at).toLocaleString('fr-FR')} · {f.app}
                   </span>
                   <Button
+                    variant="tertiary"
                     type="button"
-                    disabled={busy}
-                    onClick={() => act(() => api.shareMask(f.id, false))}
+                    isDisabled={busy}
+                    onPress={() => act(() => api.shareMask(f.id, false))}
                   >
                     Démasquer cette capture
                   </Button>
@@ -421,17 +453,24 @@ export default function Profile({ data, busy, act, onBack }) {
                   list={key === 'privateApps' ? 'known-share-apps' : undefined}
                 />
               </label>
-              <Button aria-label={'Masquer dans ' + label} disabled={busy || !value.trim()}>
+              <Button
+                variant="tertiary"
+                type="submit"
+                aria-label={'Masquer dans ' + label}
+                isDisabled={busy || !value.trim()}
+              >
                 <Plus size={16} />
               </Button>
             </form>
             <div className="profile-rules">
               {(settings[key] || []).map((rule) => (
                 <Button
+                  variant="tertiary"
+                  type="submit"
                   key={rule}
-                  disabled={busy}
+                  isDisabled={busy}
                   title={'Ne plus masquer ' + rule}
-                  onClick={() =>
+                  onPress={() =>
                     update(
                       key,
                       settings[key].filter((v) => v !== rule),

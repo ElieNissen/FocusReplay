@@ -261,13 +261,7 @@
 .public-room .social-post-top .social-status {
   grid-column: 1 / -1;
 }
-.button {
-  border-radius: 8px;
-}
-.button--secondary,
-.button--tertiary {
-  --button-fg: var(--foreground);
-}
+
 .screen {
   width: 100%;
   height: clamp(230px, 48vh, 600px);

@@ -1,3 +1,4 @@
+import { Button, Select, ListBox, Label } from '@heroui/react';
 import React, { useEffect, useState } from 'react';
 import {
   ChevronLeft,
@@ -26,44 +27,44 @@ export default function SettingsView({ settings, data, busy, act, onBack, musicS
   }, []);
   const save = (key, value) => act(() => api.settings({ [key]: value }));
   const select = (key, label, options, hint) => (
-    <label className="setting-row">
-      <span>
-        <strong>{label}</strong>
-      </span>
-      <select
-        value={settings[key]}
-        disabled={busy}
-        onChange={(e) =>
-          save(key, typeof options[0][0] === 'number' ? Number(e.target.value) : e.target.value)
-        }
-      >
-        {options.map(([value, text]) => (
-          <option key={value} value={value}>
-            {text}
-          </option>
-        ))}
-      </select>
-    </label>
+    <Select
+      className="setting-select"
+      value={String(settings[key])}
+      isDisabled={busy}
+      onChange={(value) => save(key, typeof options[0][0] === 'number' ? Number(value) : value)}
+    >
+      <Label>{label}</Label>
+      <Select.Trigger>
+        <Select.Value />
+        <Select.Indicator />
+      </Select.Trigger>
+      <Select.Popover>
+        <ListBox>
+          {options.map(([value, text]) => (
+            <ListBox.Item id={String(value)} key={value} textValue={text}>
+              {text}
+              <ListBox.ItemIndicator />
+            </ListBox.Item>
+          ))}
+        </ListBox>
+      </Select.Popover>
+    </Select>
   );
   const toggle = (key, label, hint) => (
-    <label className="setting-row">
-      <span>
-        <strong>{label}</strong>
-      </span>
-      <Toggle
-        className="toggle"
-        type="checkbox"
-        checked={settings[key]}
-        disabled={busy}
-        onChange={(e) => save(key, e.target.checked)}
-      />
-    </label>
+    <Toggle
+      label={label}
+      className="toggle"
+      type="checkbox"
+      checked={settings[key]}
+      disabled={busy}
+      onChange={(e) => save(key, e.target.checked)}
+    />
   );
   return (
     <div className="settings-page">
-      <button className="text-button" onClick={onBack}>
+      <Button variant="ghost" type="submit" className="text-button" onPress={onBack}>
         <ChevronLeft size={17} /> Retour au replay
-      </button>
+      </Button>
       <div className="page-heading">
         <div>
           <h1>Réglages</h1>
@@ -129,22 +130,18 @@ export default function SettingsView({ settings, data, busy, act, onBack, musicS
         <h2>
           <Camera size={19} /> Caméra
         </h2>
-        <label className="setting-row">
-          <span>
-            <strong>Ajouter une photo caméra aux captures</strong>
-          </span>
-          <input
-            aria-label="Ajouter une photo caméra aux captures"
-            className="toggle"
-            type="checkbox"
-            checked={settings.cameraEnabled}
-            onChange={(e) =>
-              e.target.checked
-                ? setCameraConsentOpen(true)
-                : act(() => api.settings({ cameraEnabled: false }))
-            }
-          />
-        </label>
+        <Toggle
+          label="Ajouter une photo caméra aux captures"
+          aria-label="Ajouter une photo caméra aux captures"
+          className="toggle"
+          type="checkbox"
+          checked={settings.cameraEnabled}
+          onChange={(e) =>
+            e.target.checked
+              ? setCameraConsentOpen(true)
+              : act(() => api.settings({ cameraEnabled: false }))
+          }
+        />
         {cameraConsentOpen && !settings.cameraEnabled && (
           <div className="camera-consent">
             <strong>Autoriser les photos de votre caméra ?</strong>
@@ -153,10 +150,14 @@ export default function SettingsView({ settings, data, busy, act, onBack, musicS
               session, s’arrête en pause et peut apparaître dans les exports.
             </p>
             <div>
-              <button onClick={() => setCameraConsentOpen(false)}>Pas maintenant</button>
-              <button
+              <Button variant="tertiary" type="submit" onPress={() => setCameraConsentOpen(false)}>
+                Pas maintenant
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
                 className="primary"
-                onClick={() =>
+                onPress={() =>
                   act(async () => {
                     await api.allowCamera();
                     setCameraConsentOpen(false);
@@ -164,7 +165,7 @@ export default function SettingsView({ settings, data, busy, act, onBack, musicS
                 }
               >
                 Autoriser les photos caméra
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -211,12 +212,14 @@ export default function SettingsView({ settings, data, busy, act, onBack, musicS
           [30, 'Toutes les 30 minutes'],
           [60, 'Toutes les heures'],
         ])}
-        <button
-          disabled={busy || !data.sessions.some((s) => !s.endedAt && s.status === 'recording')}
-          onClick={() => act(() => api.checkinPreview())}
+        <Button
+          variant="tertiary"
+          type="submit"
+          isDisabled={busy || !data.sessions.some((s) => !s.endedAt && s.status === 'recording')}
+          onPress={() => act(() => api.checkinPreview())}
         >
           Essayer le rappel
-        </button>
+        </Button>
         {toggle(
           'widget',
           'Afficher la mini-barre flottante',
@@ -259,10 +262,10 @@ export default function SettingsView({ settings, data, busy, act, onBack, musicS
           ['system', 'Suivre Windows'],
         ])}
       </section>
-      <button onClick={() => api.openData()}>
+      <Button variant="tertiary" type="submit" onPress={() => api.openData()}>
         <FolderOpen size={16} />
         Ouvrir les fichiers
-      </button>
+      </Button>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, ToggleButton, ToggleButtonGroup } from '@heroui/react';
 import { Input } from '@/components/ui/input';
 import { SharingControls, defaultSharing } from './sharing-controls';
 import { Radio, Users, LayoutGrid, List, ArrowUpRight, Lock } from 'lucide-react';
@@ -153,16 +153,22 @@ export function Discover() {
           <h1>On travaille ensemble</h1>
           <p>En direct et dernières sessions partagées</p>
         </div>
-        <div className="social-buttons">
-          <Button variant="outline" aria-pressed={!grid} onClick={() => setGrid(false)}>
+        <ToggleButtonGroup
+          aria-label="Affichage des sessions"
+          selectionMode="single"
+          disallowEmptySelection
+          selectedKeys={new Set([grid ? 'room' : 'feed'])}
+          onSelectionChange={(keys) => setGrid(keys.has('room'))}
+        >
+          <ToggleButton id="feed">
             <List size={16} />
             Fil
-          </Button>
-          <Button variant="outline" aria-pressed={grid} onClick={() => setGrid(true)}>
+          </ToggleButton>
+          <ToggleButton id="room">
             <LayoutGrid size={16} />
             Room
-          </Button>
-        </div>
+          </ToggleButton>
+        </ToggleButtonGroup>
       </div>
       {error && <p role="alert">{error}</p>}
       {loading && <p role="status">Chargement…</p>}
@@ -253,13 +259,19 @@ export function Discover() {
       </div>
       <div className="social-buttons">
         <Button
+          type="submit"
           variant="ghost"
-          disabled={!offset}
-          onClick={() => setOffset(Math.max(0, offset - 20))}
+          isDisabled={!offset}
+          onPress={() => setOffset(Math.max(0, offset - 20))}
         >
           Précédent
         </Button>
-        <Button variant="ghost" disabled={!more} onClick={() => setOffset(offset + 20)}>
+        <Button
+          type="submit"
+          variant="ghost"
+          isDisabled={!more}
+          onPress={() => setOffset(offset + 20)}
+        >
           Suivant
         </Button>
       </div>
@@ -323,18 +335,24 @@ export default function Social({ profile }: { profile: string }) {
     <section className="social-network">
       <nav className="social-tabs" aria-label="Réseau">
         <Button
-          variant={tab === 'discover' ? 'default' : 'ghost'}
-          onClick={() => setTab('discover')}
+          type="submit"
+          variant={tab === 'discover' ? 'primary' : 'ghost'}
+          onPress={() => setTab('discover')}
         >
           Découvrir
         </Button>
-        <Button variant={tab === 'friends' ? 'default' : 'ghost'} onClick={() => setTab('friends')}>
+        <Button
+          type="submit"
+          variant={tab === 'friends' ? 'primary' : 'ghost'}
+          onPress={() => setTab('friends')}
+        >
           <Users size={16} />
           Amis {data?.peers.filter((p: any) => p.relationship === 'incoming').length || ''}
         </Button>
         <Button
-          variant={tab === 'settings' ? 'default' : 'ghost'}
-          onClick={() => setTab('settings')}
+          type="submit"
+          variant={tab === 'settings' ? 'primary' : 'ghost'}
+          onPress={() => setTab('settings')}
         >
           Mon partage
         </Button>
@@ -372,7 +390,9 @@ export default function Social({ profile }: { profile: string }) {
               setPublicActivity(v.publicActivity);
             }}
           />
-          <Button disabled={busy}>Enregistrer le profil</Button>
+          <Button variant="tertiary" type="submit" isDisabled={busy}>
+            Enregistrer le profil
+          </Button>
           {data?.blocks.length > 0 && (
             <div>
               <h3>Profils bloqués</h3>
@@ -381,8 +401,8 @@ export default function Social({ profile }: { profile: string }) {
                   type="button"
                   key={p.profile}
                   variant="outline"
-                  disabled={busy}
-                  onClick={() => act(() => api('/block', { peer: p.profile, blocked: false }))}
+                  isDisabled={busy}
+                  onPress={() => act(() => api('/block', { peer: p.profile, blocked: false }))}
                 >
                   Débloquer @{p.profile}
                 </Button>
@@ -412,7 +432,9 @@ export default function Social({ profile }: { profile: string }) {
                 required
                 onChange={(e) => setQuery(e.target.value)}
               />
-              <Button disabled={busy}>Rechercher</Button>
+              <Button variant="tertiary" type="submit" isDisabled={busy}>
+                Rechercher
+              </Button>
             </div>
           </form>
           {results.map((p) => (
@@ -421,8 +443,10 @@ export default function Social({ profile }: { profile: string }) {
                 {p.name} · @{p.profile}
               </span>
               <Button
-                disabled={busy || data?.peers.some((a: any) => a.profile === p.profile)}
-                onClick={() => act(() => api('/request', { peer: p.profile }))}
+                variant="tertiary"
+                type="submit"
+                isDisabled={busy || data?.peers.some((a: any) => a.profile === p.profile)}
+                onPress={() => act(() => api('/request', { peer: p.profile }))}
               >
                 Demander en ami
               </Button>
@@ -458,8 +482,10 @@ export default function Social({ profile }: { profile: string }) {
               {p.software && <p>{p.software}</p>}
               {p.relationship === 'incoming' && (
                 <Button
-                  disabled={busy}
-                  onClick={() => act(() => api('/accept', { peer: p.profile }))}
+                  variant="tertiary"
+                  type="submit"
+                  isDisabled={busy}
+                  onPress={() => act(() => api('/accept', { peer: p.profile }))}
                 >
                   Accepter
                 </Button>
@@ -501,9 +527,10 @@ export default function Social({ profile }: { profile: string }) {
               <div className="social-buttons">
                 <a href={'/?profile=' + p.profile}>Replay privé</a>
                 <Button
+                  type="submit"
                   variant="ghost"
-                  disabled={busy}
-                  onClick={() => act(() => api('/remove', { peer: p.profile }))}
+                  isDisabled={busy}
+                  onPress={() => act(() => api('/remove', { peer: p.profile }))}
                 >
                   {p.relationship === 'friend'
                     ? 'Retirer cet ami'
@@ -512,9 +539,10 @@ export default function Social({ profile }: { profile: string }) {
                       : 'Annuler la demande'}
                 </Button>
                 <Button
+                  type="submit"
                   variant="ghost"
-                  disabled={busy}
-                  onClick={() => act(() => api('/block', { peer: p.profile, blocked: true }))}
+                  isDisabled={busy}
+                  onPress={() => act(() => api('/block', { peer: p.profile, blocked: true }))}
                 >
                   Bloquer
                 </Button>

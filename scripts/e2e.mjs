@@ -205,7 +205,7 @@ try {
     }
   });
   expect(blocked).toBe(true);
-  await page.getByRole('checkbox', { name: 'Ajouter une photo caméra aux captures' }).click();
+  await page.getByRole('switch', { name: 'Ajouter une photo caméra aux captures' }).press('Space');
   await expect(page.getByText('Autoriser les photos de votre caméra ?')).toBeVisible();
   expect(
     await page.evaluate(() => window.focusReplay.state().then((s) => s.settings.cameraEnabled)),
@@ -274,10 +274,10 @@ try {
   });
   await page.reload();
   await page.getByRole('button', { name: 'Réglages', exact: true }).click();
-  await page.getByRole('checkbox', { name: 'À l’ouverture', exact: true }).check();
+  await page.getByRole('switch', { name: 'À l’ouverture', exact: true }).press('Space');
   const launch = page
     .locator('.music-slot')
-    .filter({ has: page.getByRole('checkbox', { name: 'À l’ouverture', exact: true }) });
+    .filter({ has: page.getByRole('switch', { name: 'À l’ouverture', exact: true }) });
   await launch.getByRole('button', { name: 'Spotify', exact: true }).click();
   await launch.getByRole('button', { name: 'Titres aléatoires', exact: true }).click();
   await launch
@@ -288,17 +288,17 @@ try {
   await expect(
     launch.getByRole('button', { name: 'Retirer · Focus test track', exact: true }),
   ).toBeVisible();
-  await page.getByRole('checkbox', { name: 'Pendant la session', exact: true }).check();
+  await page.getByRole('switch', { name: 'Pendant la session', exact: true }).press('Space');
   const soundtrack = page
     .locator('.music-slot')
-    .filter({ has: page.getByRole('checkbox', { name: 'Pendant la session', exact: true }) });
+    .filter({ has: page.getByRole('switch', { name: 'Pendant la session', exact: true }) });
   await soundtrack.getByRole('button', { name: 'Spotify', exact: true }).click();
   await soundtrack.getByRole('button', { name: 'Une playlist', exact: true }).click();
   await soundtrack.getByRole('button', { name: 'Ajouter · My test playlist', exact: true }).click();
   await soundtrack.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await page.screenshot({ path: path.join(root, 'music-picker.png'), fullPage: true });
-  await page.getByRole('checkbox', { name: 'À l’ouverture', exact: true }).uncheck();
-  await page.getByRole('checkbox', { name: 'Pendant la session', exact: true }).uncheck();
+  await page.getByRole('switch', { name: 'À l’ouverture', exact: true }).press('Space');
+  await page.getByRole('switch', { name: 'Pendant la session', exact: true }).press('Space');
   await app.evaluate(async ({ app }) => {
     const { createRequire } = process.getBuiltinModule('module');
     Object.assign(
@@ -495,8 +495,8 @@ try {
     )
     .toBe(false);
   await page.getByRole('button', { name: 'Pauses & récompenses', exact: true }).click();
-  await page.getByRole('checkbox', { name: 'Activer les récompenses' }).click();
-  await expect(page.getByRole('checkbox', { name: 'Activer les récompenses' })).toBeChecked();
+  await page.getByRole('switch', { name: 'Activer les récompenses' }).press('Space');
+  await expect(page.getByRole('switch', { name: 'Activer les récompenses' })).toBeChecked();
   await expect(page.getByText('min de travail disponibles', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
   await page.getByRole('textbox', { name: 'Nom de la récompense' }).fill('Une promenade');
