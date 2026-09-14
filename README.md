@@ -2,7 +2,8 @@
 
 **Start. Work. Rewind.** A private Windows app that makes your workday visible through periodic screenshots and foreground application history. No goals to type; optional check-ins help explain interruptions. No account required for recording.
 
-![FocusReplay dark interface with fictional demonstration data](docs/images/replay-dark.png)
+<img width="1204" height="850" alt="focusreplay thumbnail" src="https://github.com/user-attachments/assets/a63de58c-9a34-4e47-9bbf-a72288bc2297" />
+
 
 ## What it does
 
