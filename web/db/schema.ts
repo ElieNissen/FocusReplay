@@ -16,6 +16,7 @@ export const socialProfiles = sqliteTable(
     discoverable: integer('discoverable').notNull().default(0),
     publicActivity: integer('public_activity').notNull().default(0),
     publicPreview: integer('public_preview').notNull().default(0),
+    sharing: text('sharing').notNull().default('{}'),
     previews: text('previews').notNull().default('[]'),
     lastSession: text('last_session').notNull().default('null'),
     status: text('status').notNull().default('offline'),

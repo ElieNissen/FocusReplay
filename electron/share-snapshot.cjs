@@ -23,39 +23,32 @@ function buildSnapshot(data, since, now = Date.now()) {
     .sort((a, b) => a.at - b.at)
     .slice(-800);
   const activity = sessions.flatMap((s) => s.activity);
-  const buckets = new Map();
-  for (const a of activity) {
+  const overview = [];
+  for (const a of [...activity].sort((a, b) => a.from - b.from)) {
     const from = Math.max(cutoff, a.from),
       to = Math.min(until, a.to);
-    for (let t = from; t < to;) {
-      const slot = Math.floor(t / 300000) * 300000,
-        end = Math.min(to, slot + 300000);
-      const privateItem = hidden(a, data.settings);
-      const app = privateItem ? 'Données privées' : a.app;
-      const category = privateItem ? 'unknown' : a.category;
-      const key = app + '|' + category;
-      if (!buckets.has(slot)) buckets.set(slot, new Map());
-      const apps = buckets.get(slot);
-      const previous = apps.get(key) || { app, category, ms: 0, from: t, to: end };
-      previous.ms += end - t;
-      previous.to = end;
-      apps.set(key, previous);
-      t = end;
-    }
+    if (to <= from) continue;
+    const masked = hidden(a, data.settings);
+    const item = {
+      from,
+      to,
+      app: masked ? 'Données privées' : a.app,
+      domain: masked ? '' : a.domain || '',
+      category: masked ? 'unknown' : a.category,
+      workMs: !masked && a.category === 'work' ? to - from : 0,
+    };
+    const last = overview.at(-1);
+    if (
+      last &&
+      last.to === from &&
+      last.app === item.app &&
+      last.domain === item.domain &&
+      last.category === item.category
+    ) {
+      last.to = to;
+      last.workMs += item.workMs;
+    } else overview.push(item);
   }
-  const overview = [...buckets]
-    .sort(([a], [b]) => a - b)
-    .map(([slot, apps]) => {
-      const all = [...apps.values()],
-        dominant = all.sort((a, b) => b.ms - a.ms)[0];
-      return {
-        from: Math.max(cutoff, slot),
-        to: Math.min(until, slot + 300000),
-        app: dominant.app,
-        category: dominant.category,
-        workMs: all.filter((a) => a.category === 'work').reduce((n, a) => n + a.ms, 0),
-      };
-    });
   const publicFrames = frames.map((f) => {
     const privateFrame =
       hidden(f, data.settings) ||
@@ -149,6 +142,21 @@ function localPrivacy(data) {
       frames: s.frames.map((f) => ({
         ...f,
         sharedPrivate: hidden(f, settings) || nearPrivate(f.at),
+        privacyReasons: [
+          f.private && 'Capture masquée manuellement',
+          (f.sensitive || secretApp.test(f.app || '')) && 'Contenu sensible détecté',
+          (settings.privateApps || []).includes((f.app || '').toLowerCase()) && 'Logiciel masqué',
+          (settings.privateDomains || []).some(
+            (d) =>
+              (f.domain || '').toLowerCase() === d ||
+              (f.domain || '').toLowerCase().endsWith('.' + d),
+          ) && 'Site masqué',
+          (settings.privateDomains || []).length > 0 &&
+            browser.test(f.app || '') &&
+            !f.domain &&
+            'Domaine inconnu dans un navigateur',
+          nearPrivate(f.at) && 'Proche d’une activité masquée (10 s)',
+        ].filter(Boolean),
       })),
       activity: s.activity.map((a) => ({ ...a, sharedPrivate: hidden(a, settings) })),
     })),

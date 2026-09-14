@@ -1,3 +1,4 @@
+import { mediaPolicy, mediaRef, modes } from './media-policy.ts';
 const valid = (s: unknown): s is string =>
   typeof s === 'string' && /^[a-z0-9][a-z0-9-]{2,39}$/.test(s);
 const blockedSQL = `SELECT 1 FROM social_access WHERE blocked=1 AND ((owner=? AND viewer=?) OR (owner=? AND viewer=?))`;
@@ -74,7 +75,7 @@ export async function updateSocialSummary(db: any, profile: string, snapshot: an
       (f: any) =>
         f &&
         !f.private &&
-        f.available &&
+        (f.available || Object.values(f.media || {}).some((m: any) => m.available)) &&
         /^[-a-f0-9]{36}$/.test(f.id) &&
         f.at <= Date.now() - 300000 &&
         f.at > Date.now() - 86400000,
@@ -109,7 +110,7 @@ export async function socialRoute(request: Request, e: any, helpers: any) {
     const [, profile, id] = preview;
     const owner = await db
       .prepare(
-        'SELECT previews FROM social_profiles WHERE profile=? AND discoverable=1 AND public_activity=1 AND public_preview=1',
+        'SELECT previews,sharing,public_preview FROM social_profiles WHERE profile=? AND discoverable=1 AND public_activity=1',
       )
       .bind(profile)
       .first();
@@ -125,14 +126,17 @@ export async function socialRoute(request: Request, e: any, helpers: any) {
       raw &&
       JSON.parse(raw.value)?.frames.find(
         (f: any) =>
-          f.id === id &&
-          !f.private &&
-          f.available &&
-          f.at <= Date.now() - 300000 &&
-          f.at > Date.now() - 86400000,
+          f.id === id && !f.private && f.at <= Date.now() - 300000 && f.at > Date.now() - 86400000,
       );
     if (!frame) return json({ error: 'Aperçu indisponible.' }, 404);
-    const file = await e.BUCKET.get(profile + '/' + id);
+    const ref = mediaRef(
+      frame,
+      mediaPolicy(owner),
+      'public',
+      url.searchParams.get('source') === 'camera' ? 'camera' : 'screen',
+    );
+    if (!ref) return json({ error: 'Aperçu indisponible.' }, 404);
+    const file = await e.BUCKET.get(profile + '/' + ref);
     return file
       ? new Response(file.body, {
           headers: {
@@ -150,7 +154,7 @@ export async function socialRoute(request: Request, e: any, helpers: any) {
       return json({ error: 'Page invalide.' }, 400);
     const values = await rows(
       db,
-      `SELECT profile,name,status,updated,days,last_session,public_preview,previews FROM social_profiles p
+      `SELECT profile,name,status,updated,days,last_session,public_preview,previews,sharing,software FROM social_profiles p
       WHERE public_activity=1 AND discoverable=1 AND NOT EXISTS(SELECT 1 FROM social_access WHERE blocked=1 AND ((owner=? AND viewer=p.profile) OR (owner=p.profile AND viewer=?)))
       ORDER BY CASE WHEN status='recording' AND updated>? THEN 0 WHEN status='paused' AND updated>? THEN 1 ELSE 2 END,updated DESC,profile LIMIT 21 OFFSET ?`,
       me || '',
@@ -167,7 +171,12 @@ export async function socialRoute(request: Request, e: any, helpers: any) {
         updated: p.updated,
         days: JSON.parse(p.days).slice(-7),
         session: JSON.parse(p.last_session),
-        previews: p.public_preview ? JSON.parse(p.previews) : [],
+        previews: ['publicScreen', 'publicCamera'].some((k) => mediaPolicy(p)[k] !== 'hidden')
+          ? JSON.parse(p.previews)
+          : [],
+        screenMode: mediaPolicy(p).publicScreen,
+        cameraMode: mediaPolicy(p).publicCamera,
+        ...(mediaPolicy(p).publicSoftware ? { software: p.software } : {}),
       })),
       more: values.length > 20,
     });
@@ -179,7 +188,7 @@ export async function socialRoute(request: Request, e: any, helpers: any) {
   const q = db.prepare.bind(db);
   const isBlocked = (peer: string) => q(blockedSQL).bind(me, peer, peer, me).first();
   const own = await q(
-    'SELECT profile,name,discoverable,public_activity,public_preview FROM social_profiles WHERE profile=?',
+    'SELECT profile,name,discoverable,public_activity,public_preview,sharing FROM social_profiles WHERE profile=?',
   )
     .bind(me)
     .first();
@@ -208,7 +217,7 @@ export async function socialRoute(request: Request, e: any, helpers: any) {
       me,
     );
     return json({
-      me: own || { profile: me, name: me, discoverable: 0 },
+      me: { ...(own || { profile: me, name: me, discoverable: 0 }), sharing: mediaPolicy(own) },
       blocks,
       peers: peers.map((p: any) => ({
         profile: p.profile,
@@ -264,6 +273,15 @@ export async function socialRoute(request: Request, e: any, helpers: any) {
   if (!body || typeof body !== 'object') return json({ error: 'Formulaire invalide.' }, 400);
   if (url.pathname === '/api/social/profile') {
     if (
+      body.sharing &&
+      (typeof body.sharing !== 'object' ||
+        !['publicScreen', 'publicCamera', 'profileScreen', 'profileCamera'].every((k) =>
+          modes.includes(body.sharing[k]),
+        ) ||
+        typeof body.sharing.publicSoftware !== 'boolean')
+    )
+      return json({ error: 'Visibilité invalide.' }, 400);
+    if (
       typeof body.name !== 'string' ||
       !body.name.trim() ||
       body.name.length > 60 ||
@@ -284,6 +302,16 @@ export async function socialRoute(request: Request, e: any, helpers: any) {
         +(body.discoverable && body.publicActivity && !!body.publicPreview),
       )
       .run();
+    if (body.sharing) {
+      const sharing = Object.fromEntries(
+        ['publicScreen', 'publicCamera', 'profileScreen', 'profileCamera', 'publicSoftware'].map(
+          (k) => [k, body.sharing[k]],
+        ),
+      );
+      await q('UPDATE social_profiles SET sharing=? WHERE profile=?')
+        .bind(JSON.stringify(sharing), me)
+        .run();
+    }
     const snapshot = await q('SELECT value FROM state WHERE id=?')
       .bind(me + '/snapshot')
       .first();

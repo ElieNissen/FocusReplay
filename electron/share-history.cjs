@@ -32,7 +32,9 @@ function mergeHistory(previous, current, settings, now = Date.now()) {
   ];
   const frames = selectHistory(
     merge(
-      (previous?.frames || []).filter((f) => f.available || f.private),
+      (previous?.frames || []).filter(
+        (f) => f.available || f.private || Object.values(f.media || {}).some((m) => m.available),
+      ),
       current.frames,
       'id',
     ),
@@ -63,8 +65,12 @@ function mergeHistory(previous, current, settings, now = Date.now()) {
       .slice(-5000),
     overview: merge(previous?.overview, current.overview, 'from')
       .filter((a) => a.to >= now - 7 * DAY)
+      .sort((a, b) => a.from - b.from)
+      .slice(-5000)
       .map((a) =>
-        hidden(a, settings) ? { ...a, app: 'Données privées', category: 'unknown', workMs: 0 } : a,
+        hidden(a, settings)
+          ? { ...a, app: 'Données privées', domain: '', category: 'unknown', workMs: 0 }
+          : a,
       ),
     retention: { days: 90, maxImages: 800, adaptive: true },
   };

@@ -60,8 +60,105 @@ function fixture() {
     assert.equal(r.status, 200);
     return { cookie: r.headers.get('set-cookie').split(';')[0] };
   };
-  return { request, owner, config, login, files, sql };
+  return { request, owner, config, login, files, sql, env: { DB, BUCKET, PUBLISHER_KEY: secret } };
 }
+
+test('public blur and camera use separate files from private replay, and policy changes revoke immediately', async () => {
+  const f = fixture();
+  try {
+    await f.config('alice');
+    const viewer = await f.login('alice');
+    const sharing = {
+      publicScreen: 'blurred',
+      publicCamera: 'visible',
+      profileScreen: 'visible',
+      profileCamera: 'hidden',
+      publicSoftware: true,
+    };
+    const save = () =>
+      f.request(
+        'alice',
+        '/social/profile',
+        'POST',
+        { name: 'Alice', discoverable: true, publicActivity: true, sharing },
+        f.owner('alice'),
+      );
+    assert.equal((await save()).status, 200);
+    const id = '11111111-1111-4111-8111-111111111111';
+    const media = Object.fromEntries(
+      ['publicScreen', 'publicCamera', 'profileScreen'].map((key, i) => [
+        key,
+        { id: `${i + 2}1111111-1111-4111-8111-111111111111`, mode: sharing[key], available: true },
+      ]),
+    );
+    const snapshot = {
+      frames: [{ id, at: Date.now() - 600000, media }],
+      sessions: [],
+      days: [],
+      overview: [],
+    };
+    assert.equal(
+      (await f.request('alice', '/snapshot', 'PUT', snapshot, f.owner('alice'))).status,
+      200,
+    );
+    for (const [i, m] of Object.values(media).entries())
+      assert.equal(
+        (
+          await f.request(
+            'alice',
+            '/image/' + m.id,
+            'PUT',
+            new Uint8Array([255, 216, i]),
+            f.owner('alice'),
+          )
+        ).status,
+        200,
+      );
+    const publicGet = (source = 'screen') =>
+      route(
+        new Request(`https://example.test/api/social/preview/alice/${id}?source=${source}`),
+        f.env,
+      );
+    assert.deepEqual([...new Uint8Array(await (await publicGet()).arrayBuffer())], [255, 216, 0]);
+    assert.deepEqual(
+      [...new Uint8Array(await (await publicGet('camera')).arrayBuffer())],
+      [255, 216, 1],
+    );
+    assert.deepEqual(
+      [
+        ...new Uint8Array(
+          await (await f.request('alice', '/image/' + id, 'GET', undefined, viewer)).arrayBuffer(),
+        ),
+      ],
+      [255, 216, 2],
+    );
+    assert.equal(
+      (await f.request('alice', '/image/' + id + '?source=camera', 'GET', undefined, viewer))
+        .status,
+      404,
+    );
+    const value = await (await f.request('alice', '/snapshot', 'GET', undefined, viewer)).json();
+    assert.equal(value.frames[0].media, undefined);
+    assert.equal(value.frames[0].cameraAvailable, false);
+    assert.equal(
+      (await f.request('alice', '/image/' + media.profileScreen.id, 'GET', undefined, viewer))
+        .status,
+      404,
+    );
+    sharing.publicScreen = 'visible';
+    await save();
+    assert.equal((await publicGet()).status, 404);
+    sharing.publicCamera = 'hidden';
+    await save();
+    assert.equal((await publicGet('camera')).status, 404);
+    snapshot.frames[0].private = true;
+    await f.request('alice', '/snapshot', 'PUT', snapshot, f.owner('alice'));
+    assert.equal(f.files.size, 0);
+    assert.equal((await f.request('alice', '/image/' + id, 'GET', undefined, viewer)).status, 404);
+  } finally {
+    f.sql.close();
+  }
+});
 test('profile credentials and cookies cannot cross profiles; masked and removed images revoke immediately', async () => {
   const f = fixture();
   await f.config('alice');

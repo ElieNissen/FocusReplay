@@ -1,4 +1,5 @@
 import { socialRoute, updateSocialSummary, friendScope, scopedReplay } from './social-api.ts';
+import { mediaPolicy, mediaRef, viewerSnapshot, imageKeys, modes } from './media-policy.ts';
 const headers = {
   'Cache-Control': 'no-store, private',
   'X-Content-Type-Options': 'nosniff',
@@ -264,6 +265,20 @@ export async function route(request: Request, e: any) {
   if (!db || !bucket || !e.PUBLISHER_KEY) return json({ error: 'Partage indisponible.' }, 503);
   const profileKey = await sign('publisher:' + profile, e.PUBLISHER_KEY);
   const owner = request.headers.get('authorization') === 'Bearer ' + profileKey;
+  if (path === '/api/social' || path === '/api/social/profile') {
+    if (!owner) return json({ error: 'Accès refusé.' }, 401);
+    const forwarded = new Request(url.origin + path, {
+      method: request.method,
+      headers: { Origin: url.origin, 'Content-Type': 'application/json' },
+      ...(request.method === 'POST' ? { body: await limitedBody(request, 2048) } : {}),
+    });
+    return socialRoute(forwarded, e, { json, limitedBody, browserAccount: async () => profile });
+  }
+  const socialProfile = await db
+    .prepare('SELECT sharing,public_preview FROM social_profiles WHERE profile=?')
+    .bind(profile)
+    .first();
+  const policy = mediaPolicy(socialProfile);
   const config = await stateGet('config');
   if (path === '/api/config' && request.method === 'POST') {
     if (!owner) return json({ error: 'Accès refusé.' }, 401);
@@ -330,12 +345,27 @@ export async function route(request: Request, e: any) {
         return json({ error: 'Format invalide.' }, 400);
       if (body.frames.some((f: any) => !/^[-a-f0-9]{36}$/.test(f.id) || !Number.isFinite(f.at)))
         return json({ error: 'Capture invalide.' }, 400);
+      if (
+        body.frames.some(
+          (f: any) =>
+            f.media &&
+            (typeof f.media !== 'object' ||
+              Object.keys(f.media).some(
+                (k) =>
+                  !['publicScreen', 'publicCamera', 'profileScreen', 'profileCamera'].includes(k),
+              ) ||
+              Object.values(f.media).some(
+                (m: any) => !m || !/^[-a-f0-9]{36}$/.test(m.id) || !modes.includes(m.mode),
+              )),
+        )
+      )
+        return json({ error: 'Média invalide.' }, 400);
       body.frames = body.frames.filter((f: any) => f.at > Date.now() - 90 * 86400000);
       body.syncedAt = Date.now();
       await statePut('snapshot', body);
       await updateSocialSummary(db, profile, body);
       // An image is served only while listed in the current manifest. Removed/redacted images become inaccessible immediately.
-      const allowed = new Set(body.frames.filter((f: any) => !f.private).map((f: any) => f.id));
+      const allowed = new Set(body.frames.flatMap(imageKeys));
       let cursor: string | undefined;
       do {
         const listed: any = await bucket.list({ prefix, limit: 1000, cursor });
@@ -365,11 +395,12 @@ export async function route(request: Request, e: any) {
       const manifest = await stateGet('snapshot');
       if (
         !manifest?.frames.some(
-          (f: any) => f.id === id && !f.private && f.at > Date.now() - 90 * 86400000,
+          (f: any) => imageKeys(f).includes(id) && f.at > Date.now() - 90 * 86400000,
         )
       )
         return json({ error: 'Capture non autorisée.' }, 409);
-      const bytes = await limitedBody(request, 50000);
+      const modern = manifest.frames.some((f: any) => f.media && imageKeys(f).includes(id));
+      const bytes = await limitedBody(request, modern ? 12000 : 50000);
       if (bytes[0] !== 255 || bytes[1] !== 216) return json({ error: 'JPEG requis.' }, 400);
       await bucket.put(prefix + id, bytes, {
         httpMetadata: { contentType: 'image/jpeg' },
@@ -409,7 +440,7 @@ export async function route(request: Request, e: any) {
       });
     snapshot.frames = snapshot.frames.filter((f: any) => f.at > Date.now() - 90 * 86400000);
     if (Date.now() - snapshot.syncedAt > 900000) snapshot.status = 'offline';
-    return json(snapshot);
+    return json(viewerSnapshot(snapshot, policy));
   }
   if (path.startsWith('/api/image/') && request.method === 'GET') {
     const id = path.slice(11);
@@ -419,7 +450,15 @@ export async function route(request: Request, e: any) {
       )
     )
       return json({ error: 'Image indisponible.' }, 404);
-    const object = await bucket.get(prefix + id);
+    const f = snapshot.frames.find((f: any) => f.id === id);
+    const ref = mediaRef(
+      f,
+      policy,
+      'profile',
+      url.searchParams.get('source') === 'camera' ? 'camera' : 'screen',
+    );
+    if (!ref) return json({ error: 'Média masqué.' }, 404);
+    const object = await bucket.get(prefix + ref);
     return object
       ? new Response(object.body, {
           headers: { ...headers, 'Content-Type': 'image/jpeg' },

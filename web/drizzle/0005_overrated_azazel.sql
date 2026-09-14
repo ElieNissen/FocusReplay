@@ -1,0 +1,1 @@
+ALTER TABLE `social_profiles` ADD `sharing` text DEFAULT '{}' NOT NULL;

@@ -91,7 +91,10 @@ export async function storage(directory) {
       const expired = s.frames.filter((f) => f.at < cutoff);
       if (!expired.length) continue;
       const prefix = row.id.slice(0, -8);
-      for (const f of expired) await BUCKET.delete(prefix + f.id);
+      for (const f of expired) {
+        const keys=f.media?Object.values(f.media).map(m=>m.id):[f.id];
+        for(const id of keys)await BUCKET.delete(prefix+id);
+      }
       s.frames = s.frames.filter((f) => f.at >= cutoff);
       sql.prepare('UPDATE state SET value=? WHERE id=?').run(JSON.stringify(s), row.id);
     }

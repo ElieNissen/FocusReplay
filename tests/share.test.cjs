@@ -52,51 +52,57 @@ test('shared manifest excludes camera, answers and credentials, applies delay an
   );
   assert.equal(buildSnapshot(d, now, now).frames.length, 0);
 });
-test('publisher waits for uploads before clearing and never publishes another manifest after stop', async (t) => {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'focus-share-test-'));
-  t.after(() => fs.rm(dir, { recursive: true, force: true }));
-  await fs.writeFile(path.join(dir, 'frame'), 'image');
-  const d = data(),
-    calls = [];
-  let release, started;
-  const uploading = new Promise((r) => (started = r));
-  const p = new Publisher({
-    recorder: { dir, data: d, snapshot: () => d, framePath: () => path.join(dir, 'frame') },
-    safeStorage: { isEncryptionAvailable: () => true, encryptString: (s) => Buffer.from(s) },
-    nativeImage: {
-      createFromBuffer: () => ({
-        resize() {
-          return this;
-        },
-        toJPEG: () => Buffer.from([255, 216]),
-      }),
-    },
-    fetcher: async (url, opts) => {
-      calls.push([url, opts.method]);
-      if (url.includes('/image/')) {
-        started();
-        await new Promise((r) => (release = r));
-      }
-      return new Response('{}');
-    },
-  });
-  p.auth = {
-    url: 'https://example.test',
-    profile: 'alice',
-    key: 'a'.repeat(64),
-    since: at - 60000,
-    configured: true,
-  };
-  const pending = p.sync();
-  await uploading;
-  d.settings.shareEnabled = false;
-  const clearing = p.clear();
-  release();
-  await Promise.all([pending, clearing]);
-  assert.equal(calls.at(-1)[1], 'DELETE');
-  assert.equal(calls.filter((c) => c[1] === 'PUT' && c[0].endsWith('/snapshot')).length, 1);
-  assert.equal(JSON.stringify(p.state()).includes('aaaa'), false);
-});
+test(
+  'publisher waits for uploads before clearing and never publishes another manifest after stop',
+  { timeout: 10000 },
+  async (t) => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'focus-share-test-'));
+    t.after(() => fs.rm(dir, { recursive: true, force: true }));
+    await fs.writeFile(path.join(dir, 'frame'), 'image');
+    const d = data(),
+      calls = [];
+    let release, started;
+    const uploading = new Promise((r) => (started = r));
+    const p = new Publisher({
+      recorder: { dir, data: d, snapshot: () => d, framePath: () => path.join(dir, 'frame') },
+      safeStorage: { isEncryptionAvailable: () => true, encryptString: (s) => Buffer.from(s) },
+      nativeImage: {
+        createFromBuffer: () => ({
+          resize() {
+            return this;
+          },
+          toJPEG: () => Buffer.from([255, 216]),
+        }),
+      },
+      fetcher: async (url, opts) => {
+        calls.push([url, opts.method]);
+        if (url.endsWith('/social'))
+          return Response.json({ me: { sharing: { profileScreen: 'visible' } } });
+        if (url.includes('/image/')) {
+          started();
+          await new Promise((r) => (release = r));
+        }
+        return new Response('{}');
+      },
+    });
+    p.auth = {
+      url: 'https://example.test',
+      profile: 'alice',
+      key: 'a'.repeat(64),
+      since: at - 60000,
+      configured: true,
+    };
+    const pending = p.sync();
+    await uploading;
+    d.settings.shareEnabled = false;
+    const clearing = p.clear();
+    release();
+    await Promise.all([pending, clearing]);
+    assert.equal(calls.at(-1)[1], 'DELETE');
+    assert.equal(calls.filter((c) => c[1] === 'PUT' && c[0].endsWith('/snapshot')).length, 1);
+    assert.equal(JSON.stringify(p.state()).includes('aaaa'), false);
+  },
+);
 test('adaptive history covers 90 days with a strict 800-image budget and re-masks archives', () => {
   const { selectHistory, mergeHistory } = require('../electron/share-history.cjs');
   const frames = Array.from({ length: 90 * 480 }, (_, i) => ({
