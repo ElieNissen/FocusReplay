@@ -2,7 +2,7 @@
 
 ## Scene and direction
 
-A person at their desk briefly reviews a session in daylight, then returns to work. Use warm paper surfaces for controls and a dark neutral stage to distinguish captured content. Restrained terracotta accent, system sans typography. References: the topology of a video editor, the directness of Windows media controls, the simplicity of a chronological journal.
+A person at their desk briefly reviews a session, then returns to work. Version 0.9 uses the user-supplied HeroUI light/dark theme: restrained blue accent, neutral surfaces and locally bundled Geist. Keep captured content dominant. References: video editor navigation and Windows media controls. HeroUI 3.2.5 documented compound Select, Switch, Slider, Chip and Button APIs provide controls; custom CSS handles replay geometry rather than reimplementing control behavior.
 
 ## Composition
 
@@ -20,12 +20,15 @@ Session controls live in the native window title-bar area and remain visible whi
 
 Elapsed session time excludes the union of manual and system pauses, including overlaps. Paused time appears separately beside the timeline. Mixed software intervals show multiple icons/names and expose their breakdown on click. Check-ins sit in a horizontal time lane; nearby entries collapse into a counted group with a contextual detail panel. Privacy indicators use the same rules as online sharing, including adjacent sensitive observations; they do not imply that local MP4 exports are redacted.
 
-The mini overlay is 300 × 54, expanding inline for pause choices including one hour. Stop remains an icon. Interface text is not selectable while dragging; editable fields retain normal text selection. Both light and dark themes retain native window controls.
+The mini overlay is 210 × 44 without a window or CSS shadow. Pause immediately suspends capture and expands to 210 × 258 with two columns of duration presets, custom minutes and a stop icon. Stop only appears while paused. Resume collapses it. Reveal motion takes 180 ms and is disabled with reduced motion. Interface text is not selectable while dragging; editable fields retain normal text selection. Both themes retain native window controls.
 
 ## Tokens
 
-Warm off-white canvas, near-white panels, charcoal text, muted secondary text. Terracotta accent and pale accent fill. 4px spacing grid, 8/12px radii, system UI font, 12/14/16/20/28px type roles with rem sizing. No external font requests. Color states always have a text label.
+The supplied theme.css is authoritative for semantic colors. HeroUI controls use accent, surface, default, success, warning and danger roles; labels accompany privacy/color states. Geist is bundled without external font requests. CSS layers place application layout after base resets and before component styles. Timeline spacing and proportions follow timestamps. Exact recent application intervals are preserved; visual groups expose names and durations at the current zoom.
 
 ## States
 
 Empty, recording, manually paused, system suspended, capture error, software-tracking unavailable, deleted/expired image, exporting/cancelled/failed/successful, recovery after unexpected exit. New captures never move a user's review cursor unless follow-latest is explicitly on.
+
+## Product Desktop reference review (0.9)
+The user's Cosmos Product Desktop collection informed the final hierarchy: compact neutral command bars, bounded corner radii, a single strong accent for primary actions, and subtle separators rather than shadows around every region. Reference light editor and dark automation list were inspected directly. Replay geometry and the compact overlay remain custom; standard form and selection behaviors use HeroUI. The web heatmap is a disclosure so it does not displace playback controls. Secondary commands use neutral foreground for readable contrast on dark surfaces.

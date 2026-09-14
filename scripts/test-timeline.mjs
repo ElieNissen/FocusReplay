@@ -148,8 +148,8 @@ try {
     .getByRole('button', { name: 'Masquer cette capture dans le partage', exact: true })
     .click();
   await expect(
-    page.getByRole('button', { name: 'Masqué en ligne · original local', exact: true }),
-  ).toBeDisabled();
+    page.getByRole('button', { name: 'Démasquer cette capture', exact: true }),
+  ).toBeEnabled();
   await expect(page.locator('.privacy-badge')).toBeVisible();
   for (const [width, height] of [
     [860, 680],
@@ -200,6 +200,7 @@ try {
   await page.getByRole('button', { name: 'Commencer une session', exact: true }).click();
   await expect.poll(() => app.windows().some((w) => w.url().endsWith('#widget'))).toBe(true);
   const widget = app.windows().find((w) => w.url().endsWith('#widget'));
+  await expect(widget.getByRole('button')).toHaveCount(1);
   await widget.getByRole('button', { name: 'Pause', exact: true }).click();
   await widget.getByRole('button', { name: '1 h', exact: true }).waitFor();
   await widget.screenshot({ path: path.join(root, 'widget-pause.png') });
@@ -225,6 +226,8 @@ try {
         .evaluate((e) => e.value === e.max),
     )
     .toBe(true);
+  await expect(widget.getByRole('button', { name: 'Terminer la session', exact: true })).toHaveCount(0);
+  await widget.getByRole('button', { name: 'Pause', exact: true }).click();
   await widget.getByRole('button', { name: 'Terminer la session', exact: true }).click();
   console.log(
     'PASS: full-day rapid switches, pause gaps, Q/D, stable thumbnails and fixed-height zoom. ' +
@@ -233,3 +236,4 @@ try {
 } finally {
   await app.close();
 }
+

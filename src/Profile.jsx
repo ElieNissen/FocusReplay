@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import { Button } from './Hero';
+import React, { useState, useEffect } from 'react';
+import { Chip } from '@heroui/react';
+import { SharingControls, defaultSharing } from './SharingControls';
 import { ChevronLeft, ExternalLink, Link, X, Plus } from 'lucide-react';
 import { dayKey, duration } from './lib.mjs';
 const api = window.focusReplay;
@@ -18,6 +21,29 @@ export default function Profile({ data, busy, act, onBack }) {
     [invitation, setInvitation] = useState('');
   const share = data.share || {},
     settings = data.settings;
+  const [social, setSocial] = useState(null),
+    [socialError, setSocialError] = useState(''),
+    [saved, setSaved] = useState(false),
+    [filter, setFilter] = useState('');
+  useEffect(() => {
+    if (!share.connected) return;
+    let active = true;
+    api
+      .shareSocial()
+      .then((r) => {
+        if (active)
+          setSocial({
+            name: r.me.name,
+            discoverable: !!r.me.discoverable,
+            publicActivity: !!r.me.public_activity,
+            sharing: r.me.sharing || defaultSharing,
+          });
+      })
+      .catch((e) => active && setSocialError(e.message));
+    return () => {
+      active = false;
+    };
+  }, [share.connected]);
   const days = Array.from({ length: 364 }, (_, i) => {
     const d = new Date();
     d.setHours(12, 0, 0, 0);
@@ -36,15 +62,15 @@ export default function Profile({ data, busy, act, onBack }) {
   };
   return (
     <section className="settings-page profile-page">
-      <button className="text-button" onClick={onBack}>
+      <Button className="text-button" onClick={onBack}>
         <ChevronLeft size={17} /> Retour au replay
-      </button>
+      </Button>
       <div className="page-heading">
         <h1>Profil</h1>
       </div>
-      <button className="text-button" disabled={busy} onClick={() => act(() => api.shareBrowse())}>
+      <Button className="text-button" disabled={busy} onClick={() => act(() => api.shareBrowse())}>
         <ExternalLink size={16} /> Consulter un profil sans compte
-      </button>
+      </Button>
       <section className="profile-activity">
         <h2>{duration(days.reduce((n, d) => n + d.ms, 0))} de travail</h2>
         <div className="profile-calendar" aria-label="Activité des douze derniers mois">
@@ -94,12 +120,12 @@ export default function Profile({ data, busy, act, onBack }) {
             }}
           >
             <div className="profile-row">
-              <button type="button" aria-pressed={!register} onClick={() => setRegister(false)}>
+              <Button type="button" aria-pressed={!register} onClick={() => setRegister(false)}>
                 Se connecter
-              </button>
-              <button type="button" aria-pressed={register} onClick={() => setRegister(true)}>
+              </Button>
+              <Button type="button" aria-pressed={register} onClick={() => setRegister(true)}>
                 Créer mon compte
-              </button>
+              </Button>
             </div>
             <div className="profile-row">
               <label>
@@ -160,7 +186,7 @@ export default function Profile({ data, busy, act, onBack }) {
                   onChange={(e) => setAddress(e.target.value)}
                 />
               </label>
-              <button
+              <Button
                 type="button"
                 className="text-button"
                 onClick={() => {
@@ -169,23 +195,23 @@ export default function Profile({ data, busy, act, onBack }) {
                 }}
               >
                 Utiliser FocusReplay
-              </button>
+              </Button>
             </details>
-            <button className="primary" disabled={busy}>
+            <Button className="primary" disabled={busy}>
               {busy ? 'Connexion…' : register ? 'Créer mon compte' : 'Se connecter'}
-            </button>
+            </Button>
             {share.connected && (
-              <button type="button" onClick={() => setConnecting(false)}>
+              <Button type="button" onClick={() => setConnecting(false)}>
                 Annuler
-              </button>
+              </Button>
             )}
           </form>
         ) : (
           <>
             <div className="profile-row">
-              <button className="text-button" onClick={() => api.shareOpen()}>
+              <Button className="text-button" onClick={() => api.shareOpen()}>
                 <ExternalLink size={16} /> Ouvrir mon profil en ligne
-              </button>
+              </Button>
               <span>
                 {share.pendingRemoval
                   ? 'Retrait en attente'
@@ -217,37 +243,162 @@ export default function Profile({ data, busy, act, onBack }) {
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </label>
-              <button disabled={busy || password.length < 12}>
+              <Button disabled={busy || password.length < 12}>
                 {share.configured ? 'Changer' : 'Enregistrer'}
-              </button>
+              </Button>
             </form>
             {share.configured && (
-              <button
+              <Button
                 className={share.enabled ? '' : 'primary'}
                 disabled={busy}
                 onClick={() => act(() => api.shareEnable(!share.enabled))}
               >
                 {share.enabled ? 'Arrêter et retirer le replay en ligne' : 'Activer le partage'}
-              </button>
+              </Button>
             )}
             {!share.enabled && (
-              <button className="text-button" disabled={busy} onClick={() => setConnecting(true)}>
+              <Button className="text-button" disabled={busy} onClick={() => setConnecting(true)}>
                 Changer de connexion
-              </button>
+              </Button>
             )}
           </>
         )}
-        <p className="profile-caption">
-          Écran uniquement, avec une minute de retard. Jusqu’à 90 jours, avec des images
-          progressivement espacées, environ 40 Mo. Caméra et réponses aux rappels exclues.
-        </p>
+        {share.connected && (
+          <section className="audience-settings">
+            <h2>Ce que les autres voient</h2>
+            {social ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  act(async () => {
+                    await api.shareSocial({
+                      ...social,
+                      publicPreview: social.sharing.publicScreen !== 'hidden',
+                    });
+                    setSaved(true);
+                  });
+                }}
+              >
+                <SharingControls
+                  value={social}
+                  onChange={(v) => {
+                    setSocial(v);
+                    setSaved(false);
+                  }}
+                  disabled={busy}
+                />
+                <Button className="primary" disabled={busy}>
+                  Enregistrer le partage
+                </Button>
+                {saved && (
+                  <p role="status">
+                    Visibilité enregistrée. Les images disponibles sont synchronisées.
+                  </p>
+                )}
+              </form>
+            ) : (
+              <p>{socialError || 'Chargement des autorisations…'}</p>
+            )}
+          </section>
+        )}
         {share.lastSync > 0 && (
           <small>Dernier envoi à {new Date(share.lastSync).toLocaleTimeString('fr-FR')}</small>
         )}
         {share.error && <p role="alert">{share.error}</p>}
       </section>
       <section className="profile-privacy">
-        <h2>Masquer dans le partage</h2>
+        <h2>Contenus masqués</h2>
+        <p>Ces règles masquent l’écran et la caméra associés, pour tous les visiteurs.</p>
+        <label>
+          Rechercher un logiciel ou un site
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Nom ou domaine"
+          />
+        </label>
+        <div className="privacy-inventory">
+          {[
+            [
+              'privateApps',
+              'Logiciel',
+              ...new Set([
+                ...settings.privateApps,
+                ...data.sessions.flatMap((s) => s.activity.map((a) => a.app.toLowerCase())),
+              ]),
+            ],
+            [
+              'privateDomains',
+              'Site',
+              ...new Set([
+                ...settings.privateDomains,
+                ...data.sessions.flatMap((s) => s.activity.map((a) => a.domain).filter(Boolean)),
+              ]),
+            ],
+          ].flatMap(([key, kind, ...values]) =>
+            values
+              .filter((v) => v.includes(filter.toLowerCase()))
+              .map((value) => {
+                const parent =
+                  key === 'privateDomains' &&
+                  settings.privateDomains.find((d) => value === d || value.endsWith('.' + d));
+                const masked = !!parent || settings[key].includes(value);
+                const automatic =
+                  key === 'privateApps' &&
+                  /1password|bitwarden|keepass|lastpass|dashlane|credential/i.test(value);
+                return (
+                  <div className="privacy-item" key={key + value}>
+                    <div>
+                      <strong>{value}</strong>
+                      <small>
+                        {kind}
+                        {parent && parent !== value ? ' · règle ' + parent : ''}
+                      </small>
+                    </div>
+                    <Chip color={masked || automatic ? 'warning' : 'success'}>
+                      {automatic ? 'Protection automatique' : masked ? 'Masqué' : 'Autorisé'}
+                    </Chip>
+                    <Button
+                      type="button"
+                      disabled={busy || automatic}
+                      onClick={() =>
+                        update(
+                          key,
+                          masked
+                            ? settings[key].filter((v) => v !== (parent || value))
+                            : [...settings[key], value],
+                        )
+                      }
+                    >
+                      {masked ? 'Démasquer' : 'Masquer'}
+                    </Button>
+                  </div>
+                );
+              }),
+          )}
+        </div>
+        {data.sessions.flatMap((s) => s.frames).some((f) => f.private) && (
+          <details>
+            <summary>Captures masquées une par une</summary>
+            {data.sessions
+              .flatMap((s) => s.frames)
+              .filter((f) => f.private)
+              .map((f) => (
+                <div className="privacy-item" key={f.id}>
+                  <span>
+                    {new Date(f.at).toLocaleString('fr-FR')} · {f.app}
+                  </span>
+                  <Button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => act(() => api.shareMask(f.id, false))}
+                  >
+                    Démasquer cette capture
+                  </Button>
+                </div>
+              ))}
+          </details>
+        )}
         {[
           ['privateApps', 'Logiciels', app, setApp, 'Ex. Notion'],
           ['privateDomains', 'Sites', domain, setDomain, 'Ex. mail.google.com'],
@@ -270,13 +421,13 @@ export default function Profile({ data, busy, act, onBack }) {
                   list={key === 'privateApps' ? 'known-share-apps' : undefined}
                 />
               </label>
-              <button aria-label={'Masquer dans ' + label} disabled={busy || !value.trim()}>
+              <Button aria-label={'Masquer dans ' + label} disabled={busy || !value.trim()}>
                 <Plus size={16} />
-              </button>
+              </Button>
             </form>
             <div className="profile-rules">
               {(settings[key] || []).map((rule) => (
-                <button
+                <Button
                   key={rule}
                   disabled={busy}
                   title={'Ne plus masquer ' + rule}
@@ -289,7 +440,7 @@ export default function Profile({ data, busy, act, onBack }) {
                 >
                   {rule}
                   <X size={14} />
-                </button>
+                </Button>
               ))}
             </div>
           </div>

@@ -156,3 +156,6 @@ The check-in overlay offers **Toujours sur « … »** after the first work answ
 Visitors never need an account to view a password-protected share. On the website, choose **Ouvrir un profil** and enter its handle and viewer password. In Windows, **Profil → Consulter un profil sans compte** opens the same viewer in a separate sandboxed window without recorder APIs, Node access or device permissions. Account creation is for publishing and managing your own profile.
 
 Deploy your own server from this repository using [the standalone guide](web/SELF_HOSTING.md). The [social roadmap](docs/SOCIAL_ROADMAP.md) separates accounts, friends and screenshot grants.
+
+### Sharing controls (0.9)
+Profile settings separately control public feed/Room and authorized replay visibility for screen and camera. Choose hidden, degraded blur or visible. The desktop lists masked applications/sites and allows unmasking them. Public discovery is opt-in. Web replay includes camera PiP, 1–8 fps playback, frame stepping, wheel zoom and explicit pause cells.

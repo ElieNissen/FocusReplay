@@ -287,12 +287,13 @@ function updateWidget() {
   if (widget && !widget.isDestroyed()) return;
   const bounds = screen.getPrimaryDisplay().workArea;
   widget = new BrowserWindow({
-    width: 300,
-    height: 54,
-    x: bounds.x + bounds.width - 320,
+    width: 210,
+    height: 44,
+    x: bounds.x + bounds.width - 230,
     y: bounds.y + 20,
     frame: false,
     resizable: false,
+    hasShadow: false,
     alwaysOnTop: true,
     skipTaskbar: true,
     backgroundColor: '#191b1e',
@@ -713,6 +714,14 @@ else {
         recorder.changed();
         return publisher.state();
       });
+      bind('shareSocial', async (value) => {
+        const result = await publisher.social(value);
+        if (value) {
+          await publisher.sync();
+          recorder.changed();
+        }
+        return result;
+      });
       bind('shareEnable', async (enabled) => {
         if (typeof enabled !== 'boolean') throw Error('Action invalide.');
         if (enabled && !publisher.auth?.configured)
@@ -732,11 +741,12 @@ else {
           publisher.auth?.url || 'https://focusreplay-private.hushed-plume-0999.chatgpt.site',
         ),
       );
-      bind('shareMask', async (id) => {
+      bind('shareMask', async (id, masked = true) => {
+        if (typeof masked !== 'boolean') throw Error('Choix invalide.');
         await recorder.run(async () => {
           const frame = recorder.data.sessions.flatMap((s) => s.frames).find((f) => f.id === id);
           if (!frame) throw Error('Capture introuvable.');
-          frame.private = true;
+          frame.private = masked;
           await recorder.save();
           recorder.changed();
         });
@@ -800,11 +810,11 @@ else {
         if (widget && !widget.isDestroyed()) {
           const [x, y] = widget.getPosition();
           const area = screen.getDisplayMatching(widget.getBounds()).workArea;
-          const height = expanded ? 186 : 54;
+          const height = expanded ? 258 : 44;
           widget.setBounds({
-            x: Math.max(area.x, Math.min(x, area.x + area.width - 300)),
+            x: Math.max(area.x, Math.min(x, area.x + area.width - 210)),
             y: Math.max(area.y, Math.min(y, area.y + area.height - height)),
-            width: 300,
+            width: 210,
             height,
           });
         }

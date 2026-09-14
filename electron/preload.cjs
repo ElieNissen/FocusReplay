@@ -5,6 +5,7 @@ const methods = [
   'shareConnect',
   'shareLogin',
   'shareConfigure',
+  'shareSocial',
   'shareEnable',
   'shareOpen',
   'shareBrowse',
