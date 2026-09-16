@@ -278,8 +278,8 @@ try {
   const launch = page
     .locator('.music-slot')
     .filter({ has: page.getByRole('switch', { name: 'À l’ouverture', exact: true }) });
-  await launch.getByRole('button', { name: 'Spotify', exact: true }).click();
-  await launch.getByRole('button', { name: 'Titres aléatoires', exact: true }).click();
+  await launch.getByRole('radio', { name: 'Spotify', exact: true }).click();
+  await launch.getByRole('radio', { name: 'Titres aléatoires', exact: true }).click();
   await launch
     .getByRole('textbox', { name: 'Rechercher un titre · À l’ouverture', exact: true })
     .fill('focus');
@@ -292,8 +292,8 @@ try {
   const soundtrack = page
     .locator('.music-slot')
     .filter({ has: page.getByRole('switch', { name: 'Pendant la session', exact: true }) });
-  await soundtrack.getByRole('button', { name: 'Spotify', exact: true }).click();
-  await soundtrack.getByRole('button', { name: 'Une playlist', exact: true }).click();
+  await soundtrack.getByRole('radio', { name: 'Spotify', exact: true }).click();
+  await soundtrack.getByRole('radio', { name: 'Une playlist', exact: true }).click();
   await soundtrack.getByRole('button', { name: 'Ajouter · My test playlist', exact: true }).click();
   await soundtrack.getByRole('button', { name: 'Enregistrer', exact: true }).click();
   await page.screenshot({ path: path.join(root, 'music-picker.png'), fullPage: true });
@@ -507,6 +507,7 @@ try {
   await page.screenshot({ path: path.join(root, 'rewards.png'), fullPage: true });
   await page.getByRole('button', { name: 'Retour au replay', exact: true }).click();
   await page.getByRole('button', { name: 'Exporter en MP4', exact: true }).click();
+  await page.getByRole('button', { name: 'Exporter', exact: true }).click();
 
   await expect(page.getByText('Vidéo prête : replay.mp4')).toBeVisible({ timeout: 90000 });
   const mp4 = await fs.stat(path.join(root, 'replay.mp4'));

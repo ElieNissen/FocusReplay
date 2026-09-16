@@ -1,3 +1,4 @@
+import Choice from './Choice';
 import { Button } from '@heroui/react';
 import React, { useEffect, useRef, useState } from 'react';
 import { Music2, Play, Square, Plus, X, Search, ExternalLink } from 'lucide-react';
@@ -218,19 +219,15 @@ function Slot({ phase, slot, save, busy, audio, connected, status, act }) {
       {slot.enabled && (
         <div className="music-slot-options">
           <div className="music-options-row">
-            <div className="choice-buttons" role="group" aria-label={'Source · ' + names[phase]}>
-              {['local', 'spotify'].map((source) => (
-                <Button
-                  variant="tertiary"
-                  type="submit"
-                  key={source}
-                  aria-pressed={draft.source === source}
-                  onPress={() => update({ source })}
-                >
-                  {source === 'local' ? 'MP3' : 'Spotify'}
-                </Button>
-              ))}
-            </div>
+            <Choice
+              label={'Source · ' + names[phase]}
+              value={draft.source}
+              options={[
+                ['local', 'MP3'],
+                ['spotify', 'Spotify'],
+              ]}
+              onChange={(source) => update({ source })}
+            />
             <Button
               variant="tertiary"
               type="submit"
@@ -268,23 +265,16 @@ function Slot({ phase, slot, save, busy, audio, connected, status, act }) {
             </div>
           ) : (
             <>
-              <div className="choice-buttons" role="group" aria-label={'Choix · ' + names[phase]}>
-                {[
+              <Choice
+                label={'Choix · ' + names[phase]}
+                value={draft.mode}
+                options={[
                   ['track', 'Un titre'],
                   ['selection', 'Titres aléatoires'],
                   ['playlist', 'Une playlist'],
-                ].map(([mode, label]) => (
-                  <Button
-                    variant="tertiary"
-                    type="submit"
-                    key={mode}
-                    aria-pressed={draft.mode === mode}
-                    onPress={() => update({ mode, links: '', items: [] })}
-                  >
-                    {label}
-                  </Button>
-                ))}
-              </div>
+                ]}
+                onChange={(mode) => update({ mode, links: '', items: [] })}
+              />
               <div className="selected-tracks">
                 {items.map((item) => (
                   <TrackRow

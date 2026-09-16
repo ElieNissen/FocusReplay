@@ -32,3 +32,10 @@ Empty, recording, manually paused, system suspended, capture error, software-tra
 
 ## Product Desktop reference review (0.9)
 The user's Cosmos Product Desktop collection informed the final hierarchy: compact neutral command bars, bounded corner radii, a single strong accent for primary actions, and subtle separators rather than shadows around every region. Reference light editor and dark automation list were inspected directly. Replay geometry and the compact overlay remain custom; standard form and selection behaviors use HeroUI. The web heatmap is a disclosure so it does not displace playback controls. Secondary commands use neutral foreground for readable contrast on dark surfaces.
+
+## Interaction refinement, 0.9.1
+Selected navigation uses a neutral elevated surface with readable foreground and aria-current. Nested social sections use an underline; exclusive settings use HeroUI ToggleButtonGroup. Restrained gradients and inset highlights distinguish selected controls and the replay surface. The compact overlay remains shadow-free.
+
+Web filmstrip supports pointer-captured seeking with touch pan-y, keyboard seeking and a visible playhead. Thumbnail and software-group density responds to viewport width. Wheel and slider zoom center the current playhead, bounded at either end. Capture privacy uses a contextual HeroUI Popover with explicit per-capture and global rule removal labels; automatic sensitive-content guards remain.
+
+Export expands inline, offering 1–8 captures per second, 720p compact / 1080p balanced / 1080p detailed, optional camera, computed duration and approximate size range. H.264 quality presets use CRF 28/24/18. Estimates are not file-size guarantees. Local exports remain distinct from online redaction.

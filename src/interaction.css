@@ -1,0 +1,107 @@
+/* Shared interaction vocabulary. Selection uses neutral elevation, not accent text. */
+:root,
+[data-theme],
+.light,
+.dark {
+  --selection-fill: var(--surface-tertiary);
+  --selection-text: var(--foreground);
+  --relief:
+    inset 0 1px 0 color-mix(in oklch, var(--foreground) 9%, transparent),
+    0 1px 3px color-mix(in oklch, var(--background) 65%, transparent);
+}
+.button[aria-pressed='true'],
+.button.selected,
+.button[aria-current='page'],
+.toggle-button[data-selected='true'],
+.toggle-button[aria-checked='true'] {
+  color: var(--selection-text);
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--selection-fill) 94%, var(--foreground)),
+    var(--selection-fill)
+  );
+  box-shadow: var(--relief);
+  outline: 1px solid color-mix(in oklch, var(--foreground) 18%, transparent);
+  outline-offset: -1px;
+  font-weight: 600;
+}
+.button:focus-visible,
+.toggle-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+.sidebar-footer > .button {
+  background: transparent;
+  color: var(--muted);
+}
+.sidebar-footer > .button[aria-current='page'] {
+  color: var(--foreground);
+  background: var(--surface-tertiary);
+  box-shadow: var(--relief);
+}
+.choice-buttons {
+  background: var(--surface-secondary);
+  padding: 3px;
+  border-radius: 12px;
+  gap: 3px;
+}
+.choice-buttons .button:not([aria-pressed='true']) {
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+.button--secondary {
+  color: var(--foreground);
+}
+.export-control {
+  position: relative;
+}
+.export-options {
+  position: absolute;
+  z-index: 30;
+  right: 0;
+  top: calc(100% + 8px);
+  width: min(360px, calc(100vw - 32px));
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  background: var(--overlay);
+  color: var(--overlay-foreground);
+  border: 1px solid var(--separator);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px color-mix(in oklch, var(--background) 70%, transparent);
+}
+.export-options header,
+.export-estimate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.export-options small,
+.capture-privacy-menu small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.capture-privacy-menu {
+  width: min(350px, calc(100vw - 24px));
+}
+.capture-privacy-menu [role='dialog'] {
+  display: grid;
+  gap: 12px;
+}
+.capture-privacy-menu p {
+  font-size: 13px;
+  color: var(--muted);
+}
+.settings-section {
+  border-top: 1px solid var(--separator);
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto !important;
+  }
+}
+.preview-privacy-action { position: absolute; top: auto; bottom: 12px; left: 12px; z-index: 9; background: var(--surface-secondary); color: var(--foreground); box-shadow: var(--relief); }
+.context-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.session-row.selected, .session-row.selected span, .session-row.selected strong { color: var(--foreground); }

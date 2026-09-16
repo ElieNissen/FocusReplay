@@ -1,3 +1,5 @@
+import ExportOptions from './ExportOptions';
+import CapturePrivacy from './CapturePrivacy';
 import { Button } from '@heroui/react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Profile from './Profile';
@@ -501,6 +503,7 @@ export default function App() {
           <Button
             variant="tertiary"
             type="submit"
+            aria-current={view === 'profile' ? 'page' : undefined}
             className={view === 'profile' ? 'selected' : ''}
             onPress={() => {
               setView('profile');
@@ -512,6 +515,7 @@ export default function App() {
           <Button
             variant="tertiary"
             type="submit"
+            aria-current={view === 'rewards' ? 'page' : undefined}
             className={view === 'rewards' ? 'selected' : ''}
             onPress={() => {
               setView('rewards');
@@ -523,6 +527,7 @@ export default function App() {
           <Button
             variant="tertiary"
             type="submit"
+            aria-current={view === 'settings' ? 'page' : undefined}
             className={view === 'settings' ? 'selected' : ''}
             onPress={() => {
               setView('settings');
@@ -745,24 +750,16 @@ export default function App() {
                         })}
                 </h1>
               </div>
-              <Button
-                variant="tertiary"
-                type="submit"
-                isDisabled={!frames.length || exportState?.status === 'running' || busy}
-                onPress={() =>
+              <ExportOptions
+                count={frames.length}
+                speed={speed}
+                busy={busy || exportState?.status === 'running'}
+                onExport={(options) =>
                   act(() =>
-                    api.export({
-                      day,
-                      sessionId: selectedSession || undefined,
-                      fps: speed,
-                      height: 1080,
-                      includeCamera: true,
-                    }),
+                    api.export({ day, sessionId: selectedSession || undefined, ...options }),
                   )
                 }
-              >
-                <Download size={17} /> Exporter en MP4
-              </Button>
+              />
             </div>
             {exportState && (
               <div
@@ -818,26 +815,7 @@ export default function App() {
             ) : (
               <>
                 <section className="replay-stage" aria-label="Prévisualisation de la capture">
-                  <Button
-                    variant="tertiary"
-                    type="submit"
-                    className="preview-privacy-action"
-                    isDisabled={busy}
-                    title={(current.privacyReasons || []).join(' · ')}
-                    onPress={() =>
-                      current.private
-                        ? act(() => api.shareMask(current.id, false))
-                        : current.sharedPrivate
-                          ? setView('profile')
-                          : act(() => api.shareMask(current.id))
-                    }
-                  >
-                    {current.sharedPrivate
-                      ? current.private
-                        ? 'Démasquer cette capture'
-                        : 'Masqué en ligne · gérer les règles'
-                      : 'Masquer cette capture dans le partage'}
-                  </Button>
+                  <CapturePrivacy frame={current} settings={settings} busy={busy} act={act} />
                   {current.sharedPrivate && (
                     <span className="privacy-badge">
                       <EyeOff size={14} />{' '}

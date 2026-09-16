@@ -9,6 +9,7 @@
 @import '@fontsource/geist/latin-400.css';
 @import '@fontsource/geist/latin-600.css';
 @import './sharing.css';
+@import './interaction.css';
 :root,
 [data-theme] {
   --font-geist: 'Geist', sans-serif;

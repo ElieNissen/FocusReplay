@@ -144,13 +144,13 @@ try {
     await page.locator('.timeline-inner').evaluate((e) => e.getBoundingClientRect().height),
   ).toBe(224);
   await page.screenshot({ path: path.join(root, 'zoom-pause.png'), fullPage: true });
-  await page
-    .getByRole('button', { name: 'Masquer cette capture dans le partage', exact: true })
-    .click();
+  await page.getByRole('button', { name: 'Visibilité de cette capture', exact: true }).click();
+  await page.getByRole('button', { name: 'Masquer cette capture', exact: true }).click();
   await expect(
     page.getByRole('button', { name: 'Démasquer cette capture', exact: true }),
   ).toBeEnabled();
   await expect(page.locator('.privacy-badge')).toBeVisible();
+  await page.getByRole('button',{name:'Fermer le menu de partage'}).click();
   for (const [width, height] of [
     [860, 680],
     [1440, 980],
@@ -226,7 +226,9 @@ try {
         .evaluate((e) => e.value === e.max),
     )
     .toBe(true);
-  await expect(widget.getByRole('button', { name: 'Terminer la session', exact: true })).toHaveCount(0);
+  await expect(
+    widget.getByRole('button', { name: 'Terminer la session', exact: true }),
+  ).toHaveCount(0);
   await widget.getByRole('button', { name: 'Pause', exact: true }).click();
   await widget.getByRole('button', { name: 'Terminer la session', exact: true }).click();
   console.log(
@@ -236,4 +238,3 @@ try {
 } finally {
   await app.close();
 }
-

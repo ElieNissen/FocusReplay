@@ -458,13 +458,14 @@ function exportChanged(value) {
   send('focus:export', value);
 }
 async function beginExport(options = {}) {
-  options = { fps: 2, height: 1080, ...options };
+  options = { fps: 2, height: 1080, crf: 24, ...options };
   if (exportJob) throw new Error('Un export est déjà en cours.');
   if (
     !Number.isInteger(options.fps) ||
     options.fps < 1 ||
     options.fps > 8 ||
-    ![720, 1080].includes(options.height)
+    ![720, 1080].includes(options.height) ||
+    ![18, 24, 28].includes(options.crf)
   )
     throw new Error('Réglages d’export invalides.');
   if (options.day && !/^\d{4}-\d{2}-\d{2}$/.test(options.day)) throw new Error('Date invalide.');
@@ -532,6 +533,7 @@ async function beginExport(options = {}) {
       target,
       fps: options.fps,
       height: options.height,
+      crf: options.crf,
       tempRoot: path.join(dataDir(), 'export-temp'),
       signal: controller.signal,
       binary,
