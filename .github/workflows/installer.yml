@@ -1,0 +1,26 @@
+name: Build Windows installer
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm exec -- install-electron --no
+      - run: npm test
+      - run: npm run check:privacy
+      - run: npm run dist:unsigned
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: release/FocusReplay-*-Setup.exe
+          if-no-files-found: error
+          retention-days: 1
