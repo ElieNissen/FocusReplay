@@ -336,14 +336,18 @@ export default function Social({ profile }: { profile: string }) {
       <nav className="social-tabs" aria-label="Réseau">
         <Button
           type="submit"
-          variant={tab === 'discover' ? 'primary' : 'ghost'}
+          className="section-link"
+          aria-current={tab === 'discover' ? 'page' : undefined}
+          variant="ghost"
           onPress={() => setTab('discover')}
         >
           Découvrir
         </Button>
         <Button
           type="submit"
-          variant={tab === 'friends' ? 'primary' : 'ghost'}
+          className="section-link"
+          aria-current={tab === 'friends' ? 'page' : undefined}
+          variant="ghost"
           onPress={() => setTab('friends')}
         >
           <Users size={16} />
@@ -351,7 +355,9 @@ export default function Social({ profile }: { profile: string }) {
         </Button>
         <Button
           type="submit"
-          variant={tab === 'settings' ? 'primary' : 'ghost'}
+          className="section-link"
+          aria-current={tab === 'settings' ? 'page' : undefined}
+          variant="ghost"
           onPress={() => setTab('settings')}
         >
           Mon partage

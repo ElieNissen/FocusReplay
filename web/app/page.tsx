@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useLayoutEffect, useState, useRef } from 'react';
 import { Chip } from '@heroui/react';
 import { replayGroups } from '@/lib/replay-layout';
 import { Button } from '@heroui/react';
@@ -73,6 +73,13 @@ function Replay({ profile }: { profile: string }) {
     [cursor, setCursor] = useState<number | null>(null),
     [follow, setFollow] = useState(true),
     [playing, setPlaying] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(1200);
+  useEffect(() => {
+    const resize = () => setViewportWidth(window.innerWidth);
+    resize();
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, []);
   const [speed, setSpeed] = useState(2),
     [zoom, setZoom] = useState(1);
   const timeline = useRef<HTMLDivElement>(null);
@@ -123,6 +130,15 @@ function Replay({ profile }: { profile: string }) {
         );
   const frame = frames[index],
     position = follow ? frames.at(-1)?.at || 0 : (cursor ?? frame?.at ?? 0);
+  useLayoutEffect(() => {
+    const node = timeline.current;
+    if (!node || frames.length < 2) return;
+    const fraction = Math.max(
+      0,
+      Math.min(1, (position - frames[0].at) / Math.max(1, frames.at(-1).at - frames[0].at)),
+    );
+    node.scrollLeft = Math.max(0, fraction * node.scrollWidth - node.clientWidth / 2);
+  }, [zoom]);
   const gap = (data?.gaps || []).find((g: any) => position >= g.from && position < g.to);
   const step = (n: number) => {
     setFollow(false);
@@ -269,7 +285,8 @@ function Replay({ profile }: { profile: string }) {
       <nav className="days">
         <Button
           type="submit"
-          variant={!day ? 'primary' : 'outline'}
+          aria-pressed={!day}
+          variant="ghost"
           onPress={() => {
             setDay('');
             setFollow(true);
@@ -281,7 +298,8 @@ function Replay({ profile }: { profile: string }) {
           <Button
             type="submit"
             key={d}
-            variant={day === d ? 'primary' : 'outline'}
+            aria-pressed={day === d}
+            variant="ghost"
             onPress={() => {
               setDay(d);
               setFollow(false);
@@ -441,73 +459,131 @@ function Replay({ profile }: { profile: string }) {
                   <Slider.Thumb />
                 </Slider.Track>
               </Slider>
+              <div
+                className="replay-playhead"
+                aria-hidden="true"
+                style={{
+                  left:
+                    (100 * (position - frames[0].at)) /
+                      Math.max(1, frames.at(-1).at - frames[0].at) +
+                    '%',
+                }}
+              >
+                <span>{time(position)}</span>
+              </div>
               <div className="software-track" aria-label="Logiciels utilisés">
-                {replayGroups(data.overview || [], frames[0].at, frames.at(-1).at, zoom).map(
-                  (a: any) => (
-                    <button
-                      key={a.from}
-                      title={time(a.from) + '–' + time(a.to) + '\n' + a.title}
-                      className={a.category}
-                      style={{
-                        left:
-                          Math.max(
-                            0,
-                            ((a.from - frames[0].at) /
-                              Math.max(1, frames.at(-1).at - frames[0].at)) *
-                              100,
-                          ) + '%',
-                        width:
-                          Math.max(
-                            0,
-                            ((Math.min(a.to, frames.at(-1).at) - Math.max(a.from, frames[0].at)) /
-                              Math.max(1, frames.at(-1).at - frames[0].at)) *
-                              100,
-                          ) + '%',
-                      }}
-                      onClick={() => {
-                        setCursor(a.from);
-                        setFollow(false);
-                      }}
-                    >
-                      {a.app}
-                    </button>
-                  ),
-                )}
+                {replayGroups(
+                  data.overview || [],
+                  frames[0].at,
+                  frames.at(-1).at,
+                  zoom * Math.min(1, viewportWidth / 1200),
+                ).map((a: any) => (
+                  <button
+                    key={a.from}
+                    title={time(a.from) + '–' + time(a.to) + '\n' + a.title}
+                    className={a.category}
+                    style={{
+                      left:
+                        Math.max(
+                          0,
+                          ((a.from - frames[0].at) / Math.max(1, frames.at(-1).at - frames[0].at)) *
+                            100,
+                        ) + '%',
+                      width:
+                        Math.max(
+                          0,
+                          ((Math.min(a.to, frames.at(-1).at) - Math.max(a.from, frames[0].at)) /
+                            Math.max(1, frames.at(-1).at - frames[0].at)) *
+                            100,
+                        ) + '%',
+                    }}
+                    onClick={() => {
+                      setCursor(a.from);
+                      setFollow(false);
+                    }}
+                  >
+                    {a.app}
+                  </button>
+                ))}
               </div>
               <div
                 className="filmstrip"
+                onPointerDown={(e) => {
+                  if (e.button !== 0) return;
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setCursor(
+                    frames[0].at +
+                      Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) *
+                        (frames.at(-1).at - frames[0].at),
+                  );
+                  setFollow(false);
+                  setPlaying(false);
+                }}
+                onPointerMove={(e) => {
+                  if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setCursor(
+                    frames[0].at +
+                      Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) *
+                        (frames.at(-1).at - frames[0].at),
+                  );
+                }}
+                onPointerUp={(e) => {
+                  if (e.currentTarget.hasPointerCapture(e.pointerId))
+                    e.currentTarget.releasePointerCapture(e.pointerId);
+                }}
+                onClickCapture={(e) => {
+                  if (e.detail > 0) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
+                }}
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: `repeat(${Math.ceil(12 * zoom)},1fr)`,
+                  gridTemplateColumns: `repeat(${Math.ceil(Math.max(4, Math.min(12, Math.floor(viewportWidth / 100))) * zoom)},1fr)`,
                 }}
               >
-                {Array.from({ length: Math.ceil(12 * zoom) }, (_, i) => {
-                  const at =
-                    frames[0].at +
-                    ((frames.at(-1).at - frames[0].at) * i) / Math.max(1, Math.ceil(12 * zoom) - 1);
-                  const f = frames.findLast((f: any) => f.at <= at) || frames[0];
-                  const pause = (data.gaps || []).find((g: any) => at >= g.from && at < g.to);
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => {
-                        setCursor(at);
-                        setFollow(false);
-                      }}
-                      title={time(at)}
-                      className={pause ? 'replay-gap' : ''}
-                    >
-                      {pause ? (
-                        <strong>{pause.label}</strong>
-                      ) : f.private || f.available === false ? (
-                        <Lock />
-                      ) : (
-                        <CaptureImage id={f.id} syncedAt={data.syncedAt} lazy />
-                      )}
-                      <span>{time(at)}</span>
-                    </button>
-                  );
-                })}
+                {Array.from(
+                  {
+                    length: Math.ceil(
+                      Math.max(4, Math.min(12, Math.floor(viewportWidth / 100))) * zoom,
+                    ),
+                  },
+                  (_, i) => {
+                    const at =
+                      frames[0].at +
+                      ((frames.at(-1).at - frames[0].at) * i) /
+                        Math.max(
+                          1,
+                          Math.ceil(
+                            Math.max(4, Math.min(12, Math.floor(viewportWidth / 100))) * zoom,
+                          ) - 1,
+                        );
+                    const f = frames.findLast((f: any) => f.at <= at) || frames[0];
+                    const pause = (data.gaps || []).find((g: any) => at >= g.from && at < g.to);
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          setCursor(at);
+                          setFollow(false);
+                        }}
+                        title={time(at)}
+                        className={pause ? 'replay-gap' : ''}
+                      >
+                        {pause ? (
+                          <strong>{pause.label}</strong>
+                        ) : f.private || f.available === false ? (
+                          <Lock />
+                        ) : (
+                          <CaptureImage id={f.id} syncedAt={data.syncedAt} lazy />
+                        )}
+                        <span>{time(at)}</span>
+                      </button>
+                    );
+                  },
+                )}
               </div>
             </div>
           </div>

@@ -1,6 +1,6 @@
 // Group only for display. Exact activity times remain in the shared manifest.
 export function replayGroups(items: any[], from: number, to: number, zoom: number) {
-  const step = Math.max(1000, (to - from) / Math.max(6, Math.round(10 * zoom)));
+  const step = Math.max(1000, (to - from) / Math.max(3, Math.round(10 * zoom)));
   const result = [];
   for (let start = from; start < to; start += step) {
     const end = Math.min(to, start + step),

@@ -6,6 +6,7 @@
 @import './theme.css';
 
 @import './sharing.css';
+@import './interaction.css';
 :root {
   --font-geist: 'Geist', sans-serif;
   --primary: var(--accent);
