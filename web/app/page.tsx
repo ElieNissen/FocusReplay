@@ -1,5 +1,14 @@
 'use client';
-import { useEffect, useLayoutEffect, useState, useRef } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useRef,
+  useMemo,
+  useContext,
+  createContext,
+} from 'react';
+import { ReplayMediaCache } from '@/lib/replay-cache';
 import { Chip } from '@heroui/react';
 import { replayGroups } from '@/lib/replay-layout';
 import { Button } from '@heroui/react';
@@ -22,30 +31,77 @@ const apiPath = (path: string) =>
       : new URLSearchParams(window.location.search).get('profile') || 'me',
   ) +
   path;
+const MediaContext = createContext<ReplayMediaCache | null>(null);
+const todayKey = () => {
+  const d = new Date();
+  return (
+    d.getFullYear() +
+    '-' +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(d.getDate()).padStart(2, '0')
+  );
+};
+const mediaUrl = (id: string, source = 'screen', mode = 'visible') =>
+  apiPath('/image/' + id) + '?source=' + source + '&mode=' + mode;
 function CaptureImage({
   id,
   syncedAt,
   alt = '',
   lazy = false,
   source = 'screen',
+  mode = 'visible',
 }: {
   id: string;
   syncedAt: number;
   alt?: string;
   lazy?: boolean;
   source?: string;
+  mode?: string;
 }) {
+  const cache = useContext(MediaContext)!;
+  const key = mediaUrl(id, source, mode);
+  const [url, setUrl] = useState(() => cache?.peek(key));
   const [failed, setFailed] = useState(false);
-  return (
-    <img
-      loading={lazy ? 'lazy' : 'eager'}
-      src={apiPath('/image/' + id) + '?source=' + source + (failed ? '&retry=' + syncedAt : '')}
-      alt={alt}
-      onError={() => setFailed(true)}
-      onLoad={(e) => {
-        e.currentTarget.style.visibility = 'visible';
-      }}
-    />
+  const host = useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = useState(!lazy);
+  useEffect(() => {
+    if (!lazy || !host.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '160px' },
+    );
+    observer.observe(host.current);
+    return () => observer.disconnect();
+  }, [lazy]);
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    setFailed(false);
+    setUrl(cache.peek(key));
+    cache
+      .load(key, !lazy)
+      .then((url) => {
+        if (active) setUrl(url);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [cache, key, syncedAt, lazy, visible]);
+  return url ? (
+    <img src={url} alt={alt} decoding="async" />
+  ) : (
+    <span ref={host} className="capture-loading" role={lazy ? undefined : 'status'}>
+      {failed ? 'Image non reçue' : lazy ? '' : 'Chargement…'}
+    </span>
   );
 }
 export default function Home() {
@@ -69,7 +125,9 @@ function Replay({ profile }: { profile: string }) {
     [password, setPassword] = useState(''),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
-  const [day, setDay] = useState(''),
+  const cache = useMemo(() => new ReplayMediaCache(), [profile]);
+  useEffect(() => () => cache.clear(), [cache]);
+  const [day, setDay] = useState('today'),
     [cursor, setCursor] = useState<number | null>(null),
     [follow, setFollow] = useState(true),
     [playing, setPlaying] = useState(false);
@@ -98,12 +156,20 @@ function Replay({ profile }: { profile: string }) {
     try {
       const r = await fetch(apiPath('/snapshot'), { cache: 'no-store' });
       if (r.status === 401) {
+        cache.clear();
         setLocked(true);
         setData(null);
         return;
       }
       if (!r.ok) throw Error('Connexion temporairement indisponible.');
-      const next = await r.json();
+      const next: any = await r.json();
+      const allowed = new Set<string>();
+      for (const f of next.frames || [])
+        if (!f.private) {
+          if (f.available !== false) allowed.add(mediaUrl(f.id, 'screen', f.screenMode));
+          if (f.cameraAvailable) allowed.add(mediaUrl(f.id, 'camera', f.cameraMode));
+        }
+      cache.retain(allowed);
       setData(next);
       setLocked(false);
       setError('');
@@ -120,7 +186,10 @@ function Replay({ profile }: { profile: string }) {
       document.removeEventListener('visibilitychange', refresh);
     };
   }, []);
-  const frames = (data?.frames || []).filter((f: any) => !day || f.day === day);
+  const selectedDay = day === 'today' ? todayKey() : day;
+  const frames = (data?.frames || [])
+    .filter((f: any) => f.day === selectedDay)
+    .sort((a: any, b: any) => a.at - b.at);
   const index =
     follow || cursor === null
       ? Math.max(0, frames.length - 1)
@@ -139,6 +208,17 @@ function Replay({ profile }: { profile: string }) {
     );
     node.scrollLeft = Math.max(0, fraction * node.scrollWidth - node.clientWidth / 2);
   }, [zoom]);
+  useEffect(() => {
+    if (locked || document.hidden) return;
+    const nearby = frames.slice(Math.max(0, index - 4), index + 25);
+    for (const f of nearby)
+      if (!f.private) {
+        if (f.available !== false)
+          void cache.load(mediaUrl(f.id, 'screen', f.screenMode)).catch(() => {});
+        if (f.cameraAvailable)
+          void cache.load(mediaUrl(f.id, 'camera', f.cameraMode)).catch(() => {});
+      }
+  }, [cache, index, data, locked, selectedDay]);
   const gap = (data?.gaps || []).find((g: any) => position >= g.from && position < g.to);
   const step = (n: number) => {
     setFollow(false);
@@ -146,12 +226,32 @@ function Replay({ profile }: { profile: string }) {
   };
   useEffect(() => {
     if (!playing) return;
-    const t = setTimeout(() => {
-      if (index >= frames.length - 1) setPlaying(false);
-      else step(1);
-    }, 1000 / speed);
-    return () => clearTimeout(t);
-  }, [playing, index, frames.length, speed]);
+    let active = true;
+    const next = frames[index + 1];
+    const pending: Promise<unknown>[] = [];
+    if (next && !next.private) {
+      if (next.available !== false)
+        pending.push(cache.load(mediaUrl(next.id, 'screen', next.screenMode), true));
+      if (next.cameraAvailable)
+        pending.push(cache.load(mediaUrl(next.id, 'camera', next.cameraMode), true));
+    }
+    let timer: ReturnType<typeof setTimeout>;
+    const delay = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, 1000 / speed);
+    });
+    void Promise.allSettled([...pending, delay]).then(() => {
+      if (!active) return;
+      if (!next) setPlaying(false);
+      else {
+        setFollow(false);
+        setCursor(next.at);
+      }
+    });
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [playing, index, data, selectedDay, speed, cache]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (
@@ -242,371 +342,393 @@ function Replay({ profile }: { profile: string }) {
         ? 'En pause'
         : 'Hors ligne';
   return (
-    <main className="profile">
-      <header>
-        <div>
-          <a href="/">FocusReplay</a>
-          <h1>@{profile}</h1>
-          <span className={'status ' + data?.status}>{status}</span>
-          {data?.syncedAt > 0 && <small>Mis à jour à {time(data.syncedAt)}</small>}
-        </div>
-        <Button
-          type="submit"
-          variant="ghost"
-          onPress={async () => {
-            await fetch(apiPath('/logout'), { method: 'POST' });
-            await fetch('/api/account/logout', { method: 'POST' });
-            setData(null);
-            setLocked(true);
-          }}
-        >
-          <LogOut />
-          Fermer
-        </Button>
-      </header>
-      <section className="activity">
-        <strong>{hours(calendar.reduce((n, d) => n + d.ms, 0))} de travail</strong>
-        <details>
-          <summary>Activité des 12 derniers mois</summary>
-          <div className="calendar" aria-label="Activité des douze derniers mois">
-            {calendar.map((d) => (
-              <span
-                key={d.day}
-                title={d.day + ' · ' + hours(d.ms)}
-                style={{
-                  opacity: d.ms ? Math.min(1, 0.3 + d.ms / 28800000) : 0.1,
-                }}
-                className={d.ms ? 'worked' : ''}
-              />
-            ))}
+    <MediaContext.Provider value={cache}>
+      <main className="profile">
+        <header>
+          <div>
+            <a href="/">FocusReplay</a>
+            <h1>@{profile}</h1>
+            <span className={'status ' + data?.status}>{status}</span>
+            {data?.syncedAt > 0 && <small>Mis à jour à {time(data.syncedAt)}</small>}
           </div>
-        </details>
-      </section>
-      <nav className="days">
-        <Button
-          type="submit"
-          aria-pressed={!day}
-          variant="ghost"
-          onPress={() => {
-            setDay('');
-            setFollow(true);
-          }}
-        >
-          Dernières sessions
-        </Button>
-        {[...new Set((data?.frames || []).map((f: any) => f.day))].reverse().map((d: any) => (
           <Button
             type="submit"
-            key={d}
-            aria-pressed={day === d}
             variant="ghost"
-            onPress={() => {
-              setDay(d);
-              setFollow(false);
-              setCursor(null);
+            onPress={async () => {
+              await fetch(apiPath('/logout'), { method: 'POST' });
+              await fetch('/api/account/logout', { method: 'POST' });
+              cache.clear();
+              setData(null);
+              setLocked(true);
             }}
           >
-            {d}
+            <LogOut />
+            Fermer
           </Button>
-        ))}
-      </nav>
-      <section className="screen">
-        {!frame ? (
-          <p>Aucune session partagée pour le moment.</p>
-        ) : gap ? (
-          <p>{gap.label}</p>
-        ) : frame.private ? (
-          <p>
-            <Lock /> Données privées
-          </p>
-        ) : frame.available === false ? (
-          <p>
-            <Lock /> Écran masqué ou image indisponible
-          </p>
-        ) : (
-          <CaptureImage
-            key={frame.id}
-            id={frame.id}
-            syncedAt={data.syncedAt}
-            alt={'Capture à ' + time(frame.at)}
-          />
-        )}
-        {!gap && !frame?.private && frame?.cameraAvailable && (
-          <div className="replay-camera">
-            <CaptureImage
-              key={frame.id + 'camera'}
-              id={frame.id}
-              source="camera"
-              syncedAt={data.syncedAt}
-              alt={'Caméra à ' + time(frame.at)}
-            />
-          </div>
-        )}
-        {frame && !frame.private && (
-          <div className="replay-visibility">
-            <Chip>
-              {frame.screenMode === 'blurred'
-                ? 'Écran flouté'
-                : frame.available === false
-                  ? 'Écran masqué'
-                  : 'Écran visible'}
-            </Chip>
-            {frame.cameraAvailable && (
-              <Chip>{frame.cameraMode === 'blurred' ? 'Caméra floutée' : 'Caméra visible'}</Chip>
-            )}
-          </div>
-        )}
-      </section>
-      {frame && (
-        <>
-          <div className="transport">
-            <span>
-              {time(position)} · {frame.private ? 'Données privées' : frame.app}
-            </span>
-            <div>
-              <Button
-                type="submit"
-                variant="ghost"
-                aria-label="Image précédente"
-                onPress={() => step(-1)}
-              >
-                <ChevronLeft />
-              </Button>
-              <Button
-                variant="tertiary"
-                type="submit"
-                aria-label={playing ? 'Pause du replay' : 'Lire le replay'}
-                onPress={() => {
-                  setFollow(false);
-                  if (index === frames.length - 1) setCursor(frames[0].at);
-                  setPlaying(!playing);
-                }}
-              >
-                {playing ? <Pause /> : <Play />}
-              </Button>
-              <Button
-                type="submit"
-                variant="ghost"
-                aria-label="Image suivante"
-                onPress={() => step(1)}
-              >
-                <ChevronRight />
-              </Button>
+        </header>
+        <section className="activity">
+          <strong>{hours(calendar.reduce((n, d) => n + d.ms, 0))} de travail</strong>
+          <details>
+            <summary>Activité des 12 derniers mois</summary>
+            <div className="calendar" aria-label="Activité des douze derniers mois">
+              {calendar.map((d) => (
+                <span
+                  key={d.day}
+                  title={d.day + ' · ' + hours(d.ms)}
+                  style={{
+                    opacity: d.ms ? Math.min(1, 0.3 + d.ms / 28800000) : 0.1,
+                  }}
+                  className={d.ms ? 'worked' : ''}
+                />
+              ))}
             </div>
+          </details>
+        </section>
+        <nav className="days">
+          <Button
+            type="submit"
+            aria-pressed={day === 'today'}
+            variant="ghost"
+            onPress={() => {
+              setDay('today');
+              setFollow(true);
+            }}
+          >
+            Aujourd’hui
+          </Button>
+          {[...new Set((data?.frames || []).map((f: any) => f.day))].reverse().map((d: any) => (
             <Button
               type="submit"
-              variant={follow ? 'primary' : 'outline'}
+              key={d}
+              aria-pressed={day === d}
+              variant="ghost"
               onPress={() => {
-                setFollow(true);
-                setPlaying(false);
+                setDay(d);
+                setFollow(false);
+                setCursor(null);
               }}
             >
-              Live · dernière capture
+              {d}
             </Button>
-          </div>
-          <div className="replay-adjustments">
-            <label>
-              Lecture · {speed} img/s
-              <Slider
-                aria-label="Vitesse de lecture"
-                minValue={1}
-                maxValue={8}
-                step={1}
-                value={speed}
-                onChange={(v) => setSpeed(Array.isArray(v) ? v[0] : v)}
-              >
-                <Slider.Track>
-                  <Slider.Fill />
-                  <Slider.Thumb />
-                </Slider.Track>
-              </Slider>
-            </label>
-            <label>
-              Zoom · ×{zoom.toFixed(1)}
-              <Slider
-                aria-label="Zoom de la timeline"
-                minValue={1}
-                maxValue={8}
-                step={0.25}
-                value={zoom}
-                onChange={(v) => setZoom(Array.isArray(v) ? v[0] : v)}
-              >
-                <Slider.Track>
-                  <Slider.Fill />
-                  <Slider.Thumb />
-                </Slider.Track>
-              </Slider>
-            </label>
-            <small>
-              {frame.at ? 'Capture du ' + new Date(frame.at).toLocaleString('fr-FR') : ''}
-            </small>
-          </div>
-          <div className="replay-timeline-scroll" ref={timeline}>
-            <div className="replay-timeline-content" style={{ width: zoom * 100 + '%' }}>
-              <Slider
-                aria-label="Timeline du replay"
-                minValue={frames[0].at}
-                maxValue={Math.max(frames[0].at + 1, frames.at(-1).at)}
-                value={position}
-                onChange={(value) => {
-                  setCursor(Array.isArray(value) ? value[0] : value);
-                  setFollow(false);
+          ))}
+        </nav>
+        <section className="screen">
+          {!frame ? (
+            <p>Aucune capture partagée pour cette journée.</p>
+          ) : gap ? (
+            <p>{gap.label}</p>
+          ) : frame.private ? (
+            <p>
+              <Lock /> Données privées
+            </p>
+          ) : frame.available === false ? (
+            <p>
+              <Lock />{' '}
+              {frame.screenMode === 'hidden'
+                ? 'Écran masqué par le propriétaire'
+                : 'Image en attente de synchronisation'}
+            </p>
+          ) : (
+            <CaptureImage
+              key={frame.id}
+              id={frame.id}
+              mode={frame.screenMode}
+              syncedAt={data.syncedAt}
+              alt={'Capture à ' + time(frame.at)}
+            />
+          )}
+          {!gap && !frame?.private && frame?.cameraAvailable && (
+            <div className="replay-camera">
+              <CaptureImage
+                key={frame.id + 'camera'}
+                id={frame.id}
+                mode={frame.cameraMode}
+                source="camera"
+                syncedAt={data.syncedAt}
+                alt={'Caméra à ' + time(frame.at)}
+              />
+            </div>
+          )}
+          {frame && !frame.private && (
+            <div className="replay-visibility">
+              <Chip>
+                {frame.screenMode === 'blurred'
+                  ? 'Écran flouté'
+                  : frame.screenMode === 'hidden'
+                    ? 'Écran masqué'
+                    : frame.available === false
+                      ? 'Image en attente'
+                      : 'Écran visible'}
+              </Chip>
+              {frame.cameraAvailable && (
+                <Chip>{frame.cameraMode === 'blurred' ? 'Caméra floutée' : 'Caméra visible'}</Chip>
+              )}
+            </div>
+          )}
+        </section>
+        {frame && (
+          <>
+            <div className="transport">
+              <span>
+                {time(position)} · {frame.private ? 'Données privées' : frame.app}
+              </span>
+              <div>
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  aria-label="Image précédente"
+                  onPress={() => step(-1)}
+                >
+                  <ChevronLeft />
+                </Button>
+                <Button
+                  variant="tertiary"
+                  type="submit"
+                  aria-label={playing ? 'Pause du replay' : 'Lire le replay'}
+                  onPress={() => {
+                    setFollow(false);
+                    if (index === frames.length - 1) setCursor(frames[0].at);
+                    setPlaying(!playing);
+                  }}
+                >
+                  {playing ? <Pause /> : <Play />}
+                </Button>
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  aria-label="Image suivante"
+                  onPress={() => step(1)}
+                >
+                  <ChevronRight />
+                </Button>
+              </div>
+              <Button
+                type="submit"
+                variant={follow ? 'primary' : 'outline'}
+                onPress={() => {
+                  setFollow(true);
                   setPlaying(false);
                 }}
               >
-                <Slider.Track>
-                  <Slider.Fill />
-                  <Slider.Thumb />
-                </Slider.Track>
-              </Slider>
-              <div
-                className="replay-playhead"
-                aria-hidden="true"
-                style={{
-                  left:
-                    (100 * (position - frames[0].at)) /
-                      Math.max(1, frames.at(-1).at - frames[0].at) +
-                    '%',
-                }}
-              >
-                <span>{time(position)}</span>
-              </div>
-              <div className="software-track" aria-label="Logiciels utilisés">
-                {replayGroups(
-                  data.overview || [],
-                  frames[0].at,
-                  frames.at(-1).at,
-                  zoom * Math.min(1, viewportWidth / 1200),
-                ).map((a: any) => (
-                  <button
-                    key={a.from}
-                    title={time(a.from) + '–' + time(a.to) + '\n' + a.title}
-                    className={a.category}
-                    style={{
-                      left:
-                        Math.max(
-                          0,
-                          ((a.from - frames[0].at) / Math.max(1, frames.at(-1).at - frames[0].at)) *
-                            100,
-                        ) + '%',
-                      width:
-                        Math.max(
-                          0,
-                          ((Math.min(a.to, frames.at(-1).at) - Math.max(a.from, frames[0].at)) /
-                            Math.max(1, frames.at(-1).at - frames[0].at)) *
-                            100,
-                        ) + '%',
-                    }}
-                    onClick={() => {
-                      setCursor(a.from);
-                      setFollow(false);
-                    }}
-                  >
-                    {a.app}
-                  </button>
-                ))}
-              </div>
-              <div
-                className="filmstrip"
-                onPointerDown={(e) => {
-                  if (e.button !== 0) return;
-                  e.currentTarget.setPointerCapture(e.pointerId);
-                  const r = e.currentTarget.getBoundingClientRect();
-                  setCursor(
-                    frames[0].at +
-                      Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) *
-                        (frames.at(-1).at - frames[0].at),
-                  );
-                  setFollow(false);
-                  setPlaying(false);
-                }}
-                onPointerMove={(e) => {
-                  if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
-                  const r = e.currentTarget.getBoundingClientRect();
-                  setCursor(
-                    frames[0].at +
-                      Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) *
-                        (frames.at(-1).at - frames[0].at),
-                  );
-                }}
-                onPointerUp={(e) => {
-                  if (e.currentTarget.hasPointerCapture(e.pointerId))
-                    e.currentTarget.releasePointerCapture(e.pointerId);
-                }}
-                onClickCapture={(e) => {
-                  if (e.detail > 0) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }
-                }}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${Math.ceil(Math.max(4, Math.min(12, Math.floor(viewportWidth / 100))) * zoom)},1fr)`,
-                }}
-              >
-                {Array.from(
-                  {
-                    length: Math.ceil(
-                      Math.max(4, Math.min(12, Math.floor(viewportWidth / 100))) * zoom,
-                    ),
-                  },
-                  (_, i) => {
-                    const at =
+                Live · dernière capture
+              </Button>
+            </div>
+            <div className="replay-adjustments">
+              <label>
+                Lecture · {speed} img/s
+                <Slider
+                  aria-label="Vitesse de lecture"
+                  minValue={1}
+                  maxValue={8}
+                  step={1}
+                  value={speed}
+                  onChange={(v) => setSpeed(Array.isArray(v) ? v[0] : v)}
+                >
+                  <Slider.Track>
+                    <Slider.Fill />
+                    <Slider.Thumb />
+                  </Slider.Track>
+                </Slider>
+              </label>
+              <label>
+                Zoom · ×{zoom.toFixed(1)}
+                <Slider
+                  aria-label="Zoom de la timeline"
+                  minValue={1}
+                  maxValue={8}
+                  step={0.25}
+                  value={zoom}
+                  onChange={(v) => setZoom(Array.isArray(v) ? v[0] : v)}
+                >
+                  <Slider.Track>
+                    <Slider.Fill />
+                    <Slider.Thumb />
+                  </Slider.Track>
+                </Slider>
+              </label>
+              <small>
+                {frame.at ? 'Capture du ' + new Date(frame.at).toLocaleString('fr-FR') : ''}
+              </small>
+            </div>
+            <div className="replay-timeline-scroll" ref={timeline}>
+              <div className="replay-timeline-content" style={{ width: zoom * 100 + '%' }}>
+                <Slider
+                  aria-label="Timeline du replay"
+                  minValue={frames[0].at}
+                  maxValue={Math.max(frames[0].at + 1, frames.at(-1).at)}
+                  value={position}
+                  onChange={(value) => {
+                    setCursor(Array.isArray(value) ? value[0] : value);
+                    setFollow(false);
+                    setPlaying(false);
+                  }}
+                >
+                  <Slider.Track>
+                    <Slider.Fill />
+                    <Slider.Thumb />
+                  </Slider.Track>
+                </Slider>
+                <div
+                  className="replay-playhead"
+                  aria-hidden="true"
+                  style={{
+                    left:
+                      (100 * (position - frames[0].at)) /
+                        Math.max(1, frames.at(-1).at - frames[0].at) +
+                      '%',
+                  }}
+                >
+                  <span>{time(position)}</span>
+                </div>
+                <div className="software-track" aria-label="Logiciels utilisés">
+                  {replayGroups(
+                    data.overview || [],
+                    frames[0].at,
+                    frames.at(-1).at,
+                    zoom * Math.min(1, viewportWidth / 1200),
+                  ).map((a: any) => (
+                    <button
+                      key={a.from}
+                      title={time(a.from) + '–' + time(a.to) + '\n' + a.title}
+                      className={a.category}
+                      style={{
+                        left:
+                          Math.max(
+                            0,
+                            ((a.from - frames[0].at) /
+                              Math.max(1, frames.at(-1).at - frames[0].at)) *
+                              100,
+                          ) + '%',
+                        width:
+                          Math.max(
+                            0,
+                            ((Math.min(a.to, frames.at(-1).at) - Math.max(a.from, frames[0].at)) /
+                              Math.max(1, frames.at(-1).at - frames[0].at)) *
+                              100,
+                          ) + '%',
+                      }}
+                      onClick={() => {
+                        setCursor(a.from);
+                        setFollow(false);
+                      }}
+                    >
+                      {a.app}
+                    </button>
+                  ))}
+                </div>
+                <div
+                  className="filmstrip"
+                  onPointerDown={(e) => {
+                    if (e.button !== 0) return;
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setCursor(
                       frames[0].at +
-                      ((frames.at(-1).at - frames[0].at) * i) /
-                        Math.max(
-                          1,
-                          Math.ceil(
-                            Math.max(4, Math.min(12, Math.floor(viewportWidth / 100))) * zoom,
-                          ) - 1,
-                        );
-                    const f = frames.findLast((f: any) => f.at <= at) || frames[0];
-                    const pause = (data.gaps || []).find((g: any) => at >= g.from && at < g.to);
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          setCursor(at);
-                          setFollow(false);
-                        }}
-                        title={time(at)}
-                        className={pause ? 'replay-gap' : ''}
-                      >
-                        {pause ? (
-                          <strong>{pause.label}</strong>
-                        ) : f.private || f.available === false ? (
-                          <Lock />
-                        ) : (
-                          <CaptureImage id={f.id} syncedAt={data.syncedAt} lazy />
-                        )}
-                        <span>{time(at)}</span>
-                      </button>
+                        Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) *
+                          (frames.at(-1).at - frames[0].at),
                     );
-                  },
-                )}
+                    setFollow(false);
+                    setPlaying(false);
+                  }}
+                  onPointerMove={(e) => {
+                    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return;
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setCursor(
+                      frames[0].at +
+                        Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) *
+                          (frames.at(-1).at - frames[0].at),
+                    );
+                  }}
+                  onPointerUp={(e) => {
+                    if (e.currentTarget.hasPointerCapture(e.pointerId))
+                      e.currentTarget.releasePointerCapture(e.pointerId);
+                  }}
+                  onClickCapture={(e) => {
+                    if (e.detail > 0) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }
+                  }}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${Math.ceil(Math.max(4, Math.min(12, Math.floor(viewportWidth / 100))) * zoom)},1fr)`,
+                  }}
+                >
+                  {Array.from(
+                    {
+                      length: Math.ceil(
+                        Math.max(4, Math.min(12, Math.floor(viewportWidth / 100))) * zoom,
+                      ),
+                    },
+                    (_, i) => {
+                      const at =
+                        frames[0].at +
+                        ((frames.at(-1).at - frames[0].at) * i) /
+                          Math.max(
+                            1,
+                            Math.ceil(
+                              Math.max(4, Math.min(12, Math.floor(viewportWidth / 100))) * zoom,
+                            ) - 1,
+                          );
+                      const f = frames.findLast((f: any) => f.at <= at) || frames[0];
+                      const pause = (data.gaps || []).find((g: any) => at >= g.from && at < g.to);
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            setCursor(at);
+                            setFollow(false);
+                          }}
+                          title={time(at)}
+                          className={pause ? 'replay-gap' : ''}
+                        >
+                          {pause ? (
+                            <strong>{pause.label}</strong>
+                          ) : f.private || f.available === false ? (
+                            <Lock />
+                          ) : (
+                            <CaptureImage
+                              id={f.id}
+                              syncedAt={data.syncedAt}
+                              mode={f.screenMode}
+                              lazy
+                            />
+                          )}
+                          <span>{time(at)}</span>
+                        </button>
+                      );
+                    },
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </>
-      )}
-      <section className="sessions">
-        {(data?.sessions || []).map((s: any) => (
-          <div key={s.id}>
-            <strong>
-              {s.day} · {time(s.startedAt)}
-            </strong>
-            <span>{hours(s.workMs)} de travail</span>
-            <span>
-              {s.status === 'recording'
-                ? 'En session'
-                : s.status === 'paused'
-                  ? 'En pause'
-                  : 'Terminée'}
-            </span>
-          </div>
-        ))}
-      </section>
-      {error && <p role="status">{error}</p>}
-    </main>
+          </>
+        )}
+        <section className="sessions">
+          {(data?.sessions || [])
+            .filter(
+              (s: any) =>
+                s.day === selectedDay ||
+                new Date(s.startedAt).toLocaleDateString('en-CA') === selectedDay,
+            )
+            .map((s: any) => (
+              <div key={s.id}>
+                <strong>
+                  {s.day} · {time(s.startedAt)}
+                </strong>
+                <span>{hours(s.workMs)} de travail</span>
+                <span>
+                  {s.status === 'recording'
+                    ? 'En session'
+                    : s.status === 'paused'
+                      ? 'En pause'
+                      : 'Terminée'}
+                </span>
+              </div>
+            ))}
+        </section>
+        {error && <p role="status">{error}</p>}
+      </main>
+    </MediaContext.Provider>
   );
 }
