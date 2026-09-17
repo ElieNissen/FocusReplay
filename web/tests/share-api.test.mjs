@@ -32,7 +32,9 @@ function fixture() {
     BUCKET = {
       put: async (k, v) => files.set(k, v),
       get: async (k) => (files.has(k) ? { body: files.get(k) } : null),
-      delete: async (k) => files.delete(k),
+      delete: async (k) => {
+        for (const key of Array.isArray(k) ? k : [k]) files.delete(key);
+      },
       list: async ({ prefix }) => ({
         objects: [...files.keys()].filter((k) => k.startsWith(prefix)).map((key) => ({ key })),
         truncated: false,
@@ -251,4 +253,19 @@ test('every private read rejects anonymous requests; only decorative icons are p
     'window.svg',
   ]);
   f.sql.close();
+});
+
+test('snapshot cleanup deletes obsolete images in one batch and preserves other profiles', async () => {
+  const f = fixture();
+  try {
+    await f.config('alice');
+    for (let i=0;i<950;i++) f.files.set('alice/obsolete-'+i, new Uint8Array([255,216]));
+    f.files.set('bob/keep', new Uint8Array([255,216]));
+    const original=f.env.BUCKET.delete, calls=[];
+    f.env.BUCKET.delete=async keys=>{calls.push(keys);await original(keys);};
+    const response=await f.request('alice','/snapshot','PUT',{frames:[],sessions:[],days:[],status:'idle'},f.owner('alice'));
+    assert.equal(response.status,200);
+    assert.equal(calls.length,1); assert.equal(calls[0].length,950);
+    assert.equal(f.files.size,1);assert.ok(f.files.has('bob/keep'));
+  } finally { f.sql.close(); }
 });

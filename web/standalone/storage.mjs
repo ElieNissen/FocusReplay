@@ -61,7 +61,8 @@ export async function storage(directory) {
       }
     },
     async delete(key) {
-      await fs.rm(target(key), { force: true });
+      for (const item of Array.isArray(key) ? key : [key])
+        await fs.rm(target(item), { force: true });
     },
     async list({ prefix, limit = 1000, cursor }) {
       if (!/^[a-z0-9-]{1,48}\/$/.test(prefix)) throw Error('Invalid prefix');
@@ -92,8 +93,8 @@ export async function storage(directory) {
       if (!expired.length) continue;
       const prefix = row.id.slice(0, -8);
       for (const f of expired) {
-        const keys=f.media?Object.values(f.media).map(m=>m.id):[f.id];
-        for(const id of keys)await BUCKET.delete(prefix+id);
+        const keys = f.media ? Object.values(f.media).map((m) => m.id) : [f.id];
+        for (const id of keys) await BUCKET.delete(prefix + id);
       }
       s.frames = s.frames.filter((f) => f.at >= cutoff);
       sql.prepare('UPDATE state SET value=? WHERE id=?').run(JSON.stringify(s), row.id);

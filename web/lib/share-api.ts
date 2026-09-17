@@ -369,11 +369,10 @@ export async function route(request: Request, e: any) {
       let cursor: string | undefined;
       do {
         const listed: any = await bucket.list({ prefix, limit: 1000, cursor });
-        await Promise.all(
-          listed.objects
-            .filter((o: any) => !allowed.has(o.key.slice(prefix.length)))
-            .map((o: any) => bucket.delete(o.key)),
-        );
+        const obsolete = listed.objects
+          .filter((o: any) => !allowed.has(o.key.slice(prefix.length)))
+          .map((o: any) => o.key);
+        if (obsolete.length) await bucket.delete(obsolete);
         cursor = listed.truncated ? listed.cursor : undefined;
       } while (cursor);
       return json({ ok: true });
