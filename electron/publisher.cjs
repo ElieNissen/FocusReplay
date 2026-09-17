@@ -240,7 +240,8 @@ class Publisher {
         });
       // Revoke newly hidden frames before uploading anything else.
       await commit();
-      for (const f of snapshot.frames) {
+      let sinceCheckpoint = 0;
+      for (const f of [...snapshot.frames].reverse()) {
         if (!this.recorder.data.settings.shareEnabled) break;
         if (f.private) continue;
         for (const [key, m] of Object.entries(f.media)) {
@@ -256,7 +257,7 @@ class Publisher {
             if (e.code === 'ENOENT') continue;
             throw e;
           }
-          const jpeg = encodeMedia(this.nativeImage, bytes, m.mode, key.endsWith('Camera'));
+          const jpeg = encodeMedia(this.nativeImage, bytes, m.mode, key.endsWith('Camera'), key);
           // Recheck privacy after asynchronous file/network work.
           const latest = buildSnapshot(this.recorder.snapshot(), this.auth.since).frames.find(
             (x) => x.id === f.id,
@@ -271,6 +272,10 @@ class Publisher {
             body: jpeg,
           });
           this.uploaded.add(m.id);
+          if (++sinceCheckpoint >= 16 && this.recorder.data.settings.shareEnabled) {
+            await this.request('/api/snapshot', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(fresh())});
+            sinceCheckpoint = 0;
+          }
         }
       }
       // Always use fresh masking rules at the end of a transfer.

@@ -399,7 +399,8 @@ export async function route(request: Request, e: any) {
       )
         return json({ error: 'Capture non autorisée.' }, 409);
       const modern = manifest.frames.some((f: any) => f.media && imageKeys(f).includes(id));
-      const bytes = await limitedBody(request, modern ? 12000 : 50000);
+      const detailed = manifest.frames.some((f: any) => f.media?.profileScreen?.id === id && f.media.profileScreen.mode === 'visible');
+      const bytes = await limitedBody(request, detailed ? 96000 : modern ? 12000 : 50000);
       if (bytes[0] !== 255 || bytes[1] !== 216) return json({ error: 'JPEG requis.' }, 400);
       await bucket.put(prefix + id, bytes, {
         httpMetadata: { contentType: 'image/jpeg' },
