@@ -39,3 +39,8 @@ Selected navigation uses a neutral elevated surface with readable foreground and
 Web filmstrip supports pointer-captured seeking with touch pan-y, keyboard seeking and a visible playhead. Thumbnail and software-group density responds to viewport width. Wheel and slider zoom center the current playhead, bounded at either end. Capture privacy uses a contextual HeroUI Popover with explicit per-capture and global rule removal labels; automatic sensitive-content guards remain.
 
 Export expands inline, offering 1–8 captures per second, 720p compact / 1080p balanced / 1080p detailed, optional camera, computed duration and approximate size range. H.264 quality presets use CRF 28/24/18. Estimates are not file-size guarantees. Local exports remain distinct from online redaction.
+
+## Web replay playback
+The authorized web replay uses `/api/p/:profile/images` to fetch at most 16 derivatives per request. Authentication, friend scope, privacy rules and current media policy are checked before any object is read. Multipart responses are private/no-store; decoded blobs are held only in a bounded in-memory cache and revoked on logout and policy refresh. Playback fills 12–24 frames before starting, then maintains a rolling lookahead. A failed image is skipped for that playback attempt rather than causing an endless buffer loop.
+
+The web and desktop timeline share `web/lib/activity-overview.mjs`; `src/activity-overview.mjs` re-exports it for desktop imports. The preview, centered transport, ruler, filmstrip and activity track take the primary viewport. Historical statistics stay below the replay workspace. Selecting an activity group opens its duration breakdown in context.
