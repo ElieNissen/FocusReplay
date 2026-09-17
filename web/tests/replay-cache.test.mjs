@@ -54,8 +54,9 @@ test('prioritizes scrubbing over queued preloads and cancels revoked images', as
   };
   const cache = new ReplayMediaCache(8, 1);
   try {
-    const first = cache.load('first'),
-      queued = cache.load('preload').catch(() => null),
+    const first = cache.load('first');
+    await new Promise((r) => setTimeout(r, 0));
+    const queued = cache.load('preload').catch(() => null),
       priority = cache.load('cursor', true).catch(() => null);
     release.shift()();
     await first;
@@ -68,6 +69,31 @@ test('prioritizes scrubbing over queued preloads and cancels revoked images', as
   } finally {
     cache.clear();
     globalThis.fetch = originalFetch;
+    globalThis.Image = originalImage;
+  }
+});
+
+test('loads 32 decoded images with two batch requests instead of 32 individual requests', async () => {
+  const originalImage = globalThis.Image;
+  globalThis.Image = class {
+    async decode() {}
+  };
+  const calls = [];
+  const cache = new ReplayMediaCache(64, 2, async (keys) => {
+    calls.push(keys);
+    return new Map(keys.map((key) => [key, new Blob(['x'], { type: 'image/jpeg' })]));
+  });
+  try {
+    const keys = Array.from({ length: 32 }, (_, i) => 'image-' + i);
+    await Promise.all(keys.map((key) => cache.load(key)));
+    assert.equal(calls.length, 2);
+    assert.deepEqual(
+      calls.map((c) => c.length),
+      [16, 16],
+    );
+    assert.ok(keys.every((key) => cache.peek(key)));
+  } finally {
+    cache.clear();
     globalThis.Image = originalImage;
   }
 });

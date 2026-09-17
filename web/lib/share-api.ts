@@ -441,6 +441,31 @@ export async function route(request: Request, e: any) {
     if (Date.now() - snapshot.syncedAt > 900000) snapshot.status = 'offline';
     return json(viewerSnapshot(snapshot, policy));
   }
+  if (path === '/api/images' && request.method === 'GET') {
+    const items = [...new Set(url.searchParams.getAll('item'))];
+    if (
+      !items.length ||
+      items.length > 16 ||
+      items.some((item) => !/^[-a-f0-9]{36}:(screen|camera)$/.test(item))
+    )
+      return json({ error: 'Lot invalide.' }, 400);
+    const result = new FormData();
+    await Promise.all(
+      items.map(async (item) => {
+        const [id, source] = item.split(':');
+        const frame = snapshot?.frames.find(
+          (f: any) => f.id === id && !f.private && f.at > Date.now() - 90 * 86400000,
+        );
+        const ref = mediaRef(frame, policy, 'profile', source === 'camera' ? 'camera' : 'screen');
+        if (!ref) return;
+        const object = await bucket.get(prefix + ref);
+        if (!object) return;
+        const bytes = await new Response(object.body).arrayBuffer();
+        result.append(item, new Blob([bytes], { type: 'image/jpeg' }), 'capture.jpg');
+      }),
+    );
+    return new Response(result, { headers });
+  }
   if (path.startsWith('/api/image/') && request.method === 'GET') {
     const id = path.slice(11);
     if (

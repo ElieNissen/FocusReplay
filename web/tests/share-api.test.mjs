@@ -259,13 +259,77 @@ test('snapshot cleanup deletes obsolete images in one batch and preserves other 
   const f = fixture();
   try {
     await f.config('alice');
-    for (let i=0;i<950;i++) f.files.set('alice/obsolete-'+i, new Uint8Array([255,216]));
-    f.files.set('bob/keep', new Uint8Array([255,216]));
-    const original=f.env.BUCKET.delete, calls=[];
-    f.env.BUCKET.delete=async keys=>{calls.push(keys);await original(keys);};
-    const response=await f.request('alice','/snapshot','PUT',{frames:[],sessions:[],days:[],status:'idle'},f.owner('alice'));
-    assert.equal(response.status,200);
-    assert.equal(calls.length,1); assert.equal(calls[0].length,950);
-    assert.equal(f.files.size,1);assert.ok(f.files.has('bob/keep'));
-  } finally { f.sql.close(); }
+    for (let i = 0; i < 950; i++) f.files.set('alice/obsolete-' + i, new Uint8Array([255, 216]));
+    f.files.set('bob/keep', new Uint8Array([255, 216]));
+    const original = f.env.BUCKET.delete,
+      calls = [];
+    f.env.BUCKET.delete = async (keys) => {
+      calls.push(keys);
+      await original(keys);
+    };
+    const response = await f.request(
+      'alice',
+      '/snapshot',
+      'PUT',
+      { frames: [], sessions: [], days: [], status: 'idle' },
+      f.owner('alice'),
+    );
+    assert.equal(response.status, 200);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].length, 950);
+    assert.equal(f.files.size, 1);
+    assert.ok(f.files.has('bob/keep'));
+  } finally {
+    f.sql.close();
+  }
+});
+
+test('private image batches enforce authentication, policy, revocation and bounded sizes', async () => {
+  const f = fixture();
+  try {
+    await f.config('alice');
+    const viewer = await f.login('alice');
+    const id = '11111111-1111-4111-8111-111111111111';
+    const snapshot = {
+      frames: [{ id, at: Date.now(), available: true, private: false }],
+      sessions: [],
+      days: [],
+      status: 'offline',
+    };
+    await f.request('alice', '/snapshot', 'PUT', snapshot, f.owner('alice'));
+    f.files.set('alice/' + id, new Uint8Array([255, 216, 255]));
+    const path = '/images?item=' + id + ':screen&item=' + id + ':camera';
+    assert.equal((await f.request('alice', path)).status, 401);
+    const response = await f.request('alice', path, 'GET', undefined, viewer);
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('cache-control'), /no-store/);
+    const form = await response.formData();
+    assert.equal(form.has(id + ':screen'), true);
+    assert.equal(form.has(id + ':camera'), false);
+    assert.deepEqual(
+      [...new Uint8Array(await form.get(id + ':screen').arrayBuffer())],
+      [255, 216, 255],
+    );
+    snapshot.frames[0].private = true;
+    await f.request('alice', '/snapshot', 'PUT', snapshot, f.owner('alice'));
+    assert.equal(
+      [...(await (await f.request('alice', path, 'GET', undefined, viewer)).formData()).keys()]
+        .length,
+      0,
+    );
+    assert.equal(
+      (await f.request('alice', '/images?item=bad', 'GET', undefined, viewer)).status,
+      400,
+    );
+    const tooMany = Array.from(
+      { length: 17 },
+      (_, i) => 'item=' + String(i).padStart(8, '0') + '-1111-4111-8111-111111111111:screen',
+    ).join('&');
+    assert.equal(
+      (await f.request('alice', '/images?' + tooMany, 'GET', undefined, viewer)).status,
+      400,
+    );
+  } finally {
+    f.sql.close();
+  }
 });
