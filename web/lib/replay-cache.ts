@@ -1,5 +1,7 @@
 type Entry = {
   url?: string;
+  image?: HTMLImageElement;
+  bytes?: number;
   promise: Promise<string>;
   resolve: (url: string) => void;
   reject: (error: Error) => void;
@@ -51,6 +53,29 @@ export class ReplayMediaCache {
   }
   peek(key: string) {
     return this.entries.get(key)?.url;
+  }
+  trimDecoded() {
+    let bytes = 0;
+    for (const [, entry] of [...this.entries].reverse()) {
+      if (!entry.image) continue;
+      bytes += (entry.image.naturalWidth || 640) * (entry.image.naturalHeight || 360) * 4;
+      if (bytes > 96 * 1024 * 1024) entry.image = undefined;
+    }
+  }
+  async decoded(key: string): Promise<HTMLImageElement> {
+    const url = await this.load(key, true);
+    const entry = this.entries.get(key);
+    if (!entry || entry.controller.signal.aborted) throw Error('Image invalidée');
+    if (!entry.image) {
+      const image = new Image();
+      image.src = url;
+      await image.decode();
+      if (this.entries.get(key) !== entry) throw Error('Image invalidée');
+      entry.image = image;
+      this.trimDecoded();
+      return image;
+    }
+    return entry.image;
   }
   load(key: string, priority = false): Promise<string> {
     const existing = this.entries.get(key);
@@ -122,8 +147,15 @@ export class ReplayMediaCache {
                 if (entry.controller.signal.aborted || this.entries.get(key) !== entry)
                   throw Error('Image invalidée');
                 entry.url = url;
+                entry.image = image;
+                entry.bytes = blob.size;
+                this.trimDecoded();
                 const ready = [...this.entries].filter(([, e]) => e.url);
-                while (ready.length > this.limit) this.remove(ready.shift()![0]);
+                while (
+                  ready.length > this.limit ||
+                  ready.reduce((n, [, e]) => n + (e.bytes || 0), 0) > 96 * 1024 * 1024
+                )
+                  this.remove(ready.shift()![0]);
                 entry.resolve(url);
               } catch (error) {
                 if (url) URL.revokeObjectURL(url);

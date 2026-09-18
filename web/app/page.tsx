@@ -9,6 +9,7 @@ import {
   createContext,
 } from 'react';
 import { ReplayMediaCache, loadReplayBatch } from '@/lib/replay-cache';
+import ReplaySurface from '@/components/replay-surface';
 import { Chip } from '@heroui/react';
 import { replayGroups } from '@/lib/replay-layout';
 import { Button } from '@heroui/react';
@@ -125,12 +126,13 @@ function Replay({ profile }: { profile: string }) {
     [password, setPassword] = useState(''),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
-  const cache = useMemo(() => new ReplayMediaCache(160, 2, loadReplayBatch), [profile]);
+  const cache = useMemo(() => new ReplayMediaCache(1600, 2, loadReplayBatch), [profile]);
   useEffect(() => () => cache.clear(), [cache]);
   const [day, setDay] = useState('today'),
     [cursor, setCursor] = useState<number | null>(null),
     [follow, setFollow] = useState(true),
     [playing, setPlaying] = useState(false);
+  const [dayLoading, setDayLoading] = useState(false);
   const [buffer, setBuffer] = useState<{ ready: number; total: number } | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<any>(null);
   const [viewportWidth, setViewportWidth] = useState(1200);
@@ -221,6 +223,30 @@ function Replay({ profile }: { profile: string }) {
           void cache.load(mediaUrl(f.id, 'camera', f.cameraMode)).catch(() => {});
       }
   }, [cache, index, data, locked, selectedDay]);
+  const nearest = (source: string) =>
+    frames
+      .filter(
+        (f: any) =>
+          !f.private &&
+          (source === 'camera'
+            ? f.cameraAvailable && f.cameraMode === frame?.cameraMode
+            : f.available !== false && f.screenMode === frame?.screenMode),
+      )
+      .map((f: any) => ({
+        key: mediaUrl(f.id, source, source === 'camera' ? f.cameraMode : f.screenMode),
+        distance: Math.abs(f.at - position),
+      }))
+      .filter((f: any) => cache.peek(f.key))
+      .sort((a: any, b: any) => a.distance - b.distance)[0]?.key;
+  useEffect(() => {
+    if (locked || document.hidden) return;
+    const samples = frames.filter(
+      (_: any, i: number) => i % Math.max(1, Math.ceil(frames.length / 40)) === 0,
+    );
+    for (const f of samples)
+      if (!f.private && f.available !== false)
+        void cache.load(mediaUrl(f.id, 'screen', f.screenMode)).catch(() => {});
+  }, [data, selectedDay, locked, cache]);
   const gap = (data?.gaps || []).find((g: any) => position >= g.from && position < g.to);
   const step = (n: number) => {
     setPlaying(false);
@@ -244,7 +270,7 @@ function Replay({ profile }: { profile: string }) {
             ...(f.cameraAvailable ? [mediaUrl(f.id, 'camera', f.cameraMode)] : []),
           ];
     const fill = async (from: number) => {
-      const keys = frames.slice(from, from + Math.max(12, speed * 3)).flatMap(keysFor);
+      const keys = frames.slice(from, from + Math.max(24, speed * 6)).flatMap(keysFor);
       let ready = keys.filter((key: string) => cache.peek(key) || attempted.has(key)).length;
       if (ready < keys.length) setBuffer({ ready, total: keys.length });
       await Promise.allSettled(
@@ -272,6 +298,8 @@ function Replay({ profile }: { profile: string }) {
         await new Promise<void>((resolve) => {
           timer = setTimeout(resolve, 1000 / speed);
         });
+        if (!active) break;
+        await Promise.allSettled(keysFor(next).map((key) => cache.decoded(key)));
         if (!active) break;
         current++;
         setFollow(false);
@@ -475,22 +503,23 @@ function Replay({ profile }: { profile: string }) {
                   : 'Image en attente de synchronisation'}
               </p>
             ) : (
-              <CaptureImage
-                key={frame.id}
-                id={frame.id}
-                mode={frame.screenMode}
-                syncedAt={data.syncedAt}
+              <ReplaySurface
+                key={selectedDay + frame.screenMode}
+                cache={cache}
+                mediaKey={mediaUrl(frame.id, 'screen', frame.screenMode)}
+                fallbackKey={nearest('screen')}
+                revision={data.syncedAt}
                 alt={'Capture à ' + time(frame.at)}
               />
             )}
             {!gap && !frame?.private && frame?.cameraAvailable && (
               <div className="replay-camera">
-                <CaptureImage
-                  key={frame.id + 'camera'}
-                  id={frame.id}
-                  mode={frame.cameraMode}
-                  source="camera"
-                  syncedAt={data.syncedAt}
+                <ReplaySurface
+                  key={selectedDay + frame.cameraMode}
+                  cache={cache}
+                  mediaKey={mediaUrl(frame.id, 'camera', frame.cameraMode)}
+                  fallbackKey={nearest('camera')}
+                  revision={data.syncedAt}
                   alt={'Caméra à ' + time(frame.at)}
                 />
               </div>
@@ -562,6 +591,31 @@ function Replay({ profile }: { profile: string }) {
                 </Button>
               </div>
               <div className="replay-adjustments">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  isDisabled={dayLoading}
+                  onPress={async () => {
+                    setDayLoading(true);
+                    try {
+                      await Promise.allSettled(
+                        frames
+                          .filter((f: any) => !f.private)
+                          .flatMap((f: any) => [
+                            ...(f.available !== false
+                              ? [mediaUrl(f.id, 'screen', f.screenMode)]
+                              : []),
+                            ...(f.cameraAvailable ? [mediaUrl(f.id, 'camera', f.cameraMode)] : []),
+                          ])
+                          .map((key: string) => cache.load(key)),
+                      );
+                    } finally {
+                      setDayLoading(false);
+                    }
+                  }}
+                >
+                  {dayLoading ? 'Préchargement…' : 'Précharger la journée'}
+                </Button>
                 {selectedGroup && (
                   <div
                     className="replay-group-detail"

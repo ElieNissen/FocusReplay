@@ -97,3 +97,16 @@ test('loads 32 decoded images with two batch requests instead of 32 individual r
     globalThis.Image = originalImage;
   }
 });
+
+test('decoded pixels are bounded separately from downloaded images and can be restored without network', async()=>{
+  const originalFetch=globalThis.fetch, originalImage=globalThis.Image;let requests=0;
+  globalThis.fetch=async()=>{requests++;return new Response(new Blob(['x'],{type:'image/jpeg'}));};
+  globalThis.Image=class {naturalWidth=3200;naturalHeight=1800;async decode(){}};
+  const cache=new ReplayMediaCache(20,2);
+  try{
+    await Promise.all(Array.from({length:8},(_,i)=>cache.load('large-'+i)));
+    assert.ok([...cache.entries.values()].filter(e=>e.image).length<=4);
+    assert.ok(cache.peek('large-0'));assert.equal(cache.entries.get('large-0').image,undefined);
+    await cache.decoded('large-0');assert.equal(requests,8);assert.ok(cache.entries.get('large-0').image);
+  }finally{cache.clear();globalThis.fetch=originalFetch;globalThis.Image=originalImage;}
+});

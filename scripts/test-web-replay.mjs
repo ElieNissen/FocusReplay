@@ -82,7 +82,7 @@ try {
   });
   await page.goto('http://127.0.0.1:8794/?profile=fixture');
   await page.getByRole('button', { name: 'Lire le replay', exact: true }).waitFor();
-  await page.locator('.replay-camera img').waitFor();
+  await page.locator('.replay-camera canvas').waitFor();
   assert.equal(
     Number(await page.getByRole('slider', { name: 'Timeline du replay' }).getAttribute('min')),
     start,
@@ -105,13 +105,17 @@ try {
   await page.getByRole('button',{name:'Lire le replay',exact:true}).waitFor({timeout:5000});
   assert.ok(Date.now()-began<4000,'Buffered playback completes 12 frames at 8 fps without per-frame network waits');
   assert.equal(Number(await page.getByRole('slider',{name:'Timeline du replay'}).inputValue()),frames.at(-1).at);
+  const stableCanvas=await page.locator('.screen > .replay-surface canvas').elementHandle();
+  await page.getByRole('button',{name:'Image précédente'}).click();
+  await page.getByRole('button',{name:'Image suivante'}).click();
+  assert.ok(await stableCanvas.evaluate(el=>el.isConnected),'The preview canvas survives frame changes without remounting');
   await page.locator('.replay-timeline-scroll').hover();
   await page.mouse.wheel(0, -180);
   await page.waitForTimeout(220);
   assert.ok(
     Number(await page.getByRole('slider', { name: 'Zoom de la timeline' }).inputValue()) > 1,
   );
-  assert.ok(await page.locator('.replay-camera img').count());
+  assert.ok(await page.locator('.replay-camera canvas').count());
   assert.ok(await page.locator('.replay-gap').count());
   await page.locator('.replay-timeline-scroll').evaluate((e) => (e.scrollLeft = 0));
   const strip = await page.locator('.filmstrip').boundingBox();
