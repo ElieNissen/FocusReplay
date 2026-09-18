@@ -273,7 +273,11 @@ class Publisher {
           });
           this.uploaded.add(m.id);
           if (++sinceCheckpoint >= 16 && this.recorder.data.settings.shareEnabled) {
-            await this.request('/api/snapshot', {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(fresh())});
+            await this.request('/api/snapshot', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(fresh()),
+            });
             sinceCheckpoint = 0;
           }
         }
