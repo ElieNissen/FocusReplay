@@ -90,7 +90,7 @@ export default function App() {
     [cursor, setCursor] = useState(null),
     [follow, setFollow] = useState(false),
     [playing, setPlaying] = useState(false),
-    [speed, setSpeed] = useState(2),
+    [speed, setSpeed] = useState(4),
     [timelineZoom, setTimelineZoom] = useState(1);
   const [clock, setClock] = useState(Date.now()),
     [exportState, setExportState] = useState(null),
@@ -308,7 +308,7 @@ export default function App() {
   }, []);
   // Preload neighbors for instant scrubbing without loading the entire archive into memory.
   useEffect(() => {
-    for (const f of frames.slice(Math.max(0, index - 3), index + 5)) {
+    for (const f of frames.slice(Math.max(0, index - 3), index + 16)) {
       const img = new Image();
       img.src = imageUrl(f);
     }
@@ -903,8 +903,8 @@ export default function App() {
                     <input
                       aria-label="Vitesse de lecture"
                       type="range"
-                      min="1"
-                      max="8"
+                      min="4"
+                      max="30"
                       step="1"
                       value={speed}
                       onChange={(e) => setSpeed(Number(e.target.value))}

@@ -179,3 +179,79 @@ test('local privacy indicators agree with online masking including adjacent capt
   assert.equal(hidden({ app: 'Notion' }, settings), true);
   assert.equal(data.sessions[0].frames[0].sharedPrivate, undefined);
 });
+
+test('live uploads keep their authorization plan stable across checkpoints and resume after restart', async (t) => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'focus-share-growing-'));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  await fs.writeFile(path.join(dir, 'frame'), 'image');
+  const d = data();
+  d.sessions[0].startedAt = now - 850 * 60000;
+  d.sessions[0].frames = Array.from({ length: 790 }, (_, i) => ({
+    id: 'capture-' + i,
+    at: now - (820 - i) * 60000,
+    app: 'Editor',
+    category: 'work',
+  }));
+  let manifest = { frames: [] },
+    initialIds,
+    uploads = 0,
+    checkpoints = 0;
+  const objects = new Set();
+  const p = new Publisher({
+    recorder: { data: d, snapshot: () => d, framePath: () => path.join(dir, 'frame') },
+    nativeImage: {
+      createFromBuffer: () => ({
+        resize() {
+          return this;
+        },
+        toJPEG: () => Buffer.from([255, 216]),
+      }),
+    },
+    fetcher: async (url, opts) => {
+      if (url.endsWith('/social'))
+        return Response.json({ me: { sharing: { profileScreen: 'visible' } } });
+      if (url.endsWith('/snapshot')) {
+        if (opts.method === 'PUT') {
+          manifest = JSON.parse(opts.body);
+          const ids = manifest.frames.map((f) => f.id);
+          if (!initialIds) initialIds = ids;
+          assert.deepEqual(ids, initialIds, 'A checkpoint must not resample the upload queue');
+          checkpoints++;
+        }
+        return Response.json(manifest);
+      }
+      const id = url.split('/').at(-1);
+      if (!manifest.frames.some((f) => Object.values(f.media).some((m) => m.id === id)))
+        return new Response('', { status: 409 });
+      objects.add(id);
+      uploads++;
+      if (uploads === 16)
+        d.sessions[0].frames.push({ id: 'new-live', at: now - 61000, app: 'Editor' });
+      return Response.json({});
+    },
+  });
+  p.auth = {
+    url: 'https://example.test',
+    profile: 'alice',
+    key: 'a'.repeat(64),
+    configured: true,
+    since: now - 86400000,
+  };
+  await p.sync();
+  assert.equal(p.error, '');
+  assert.ok(checkpoints > 2);
+  assert.ok(uploads > 100);
+  assert.ok(manifest.frames.every((f) => f.available && objects.has(f.media.profileScreen.id)));
+});
+
+test('one new live capture does not invalidate the archived day selection', () => {
+  const { selectHistory } = require('../electron/share-history.cjs');
+  const frames = Array.from({ length: 790 }, (_, i) => ({
+    id: String(i),
+    at: now - (820 - i) * 60000,
+  }));
+  const old = new Set(selectHistory(frames, now).map((f) => f.id));
+  const next = selectHistory([...frames, { id: 'live', at: now - 61000 }], now + 1000);
+  assert.ok(next.filter((f) => !old.has(f.id)).length <= 2);
+  assert.ok(next.some((f) => f.id === 'live'));
+});

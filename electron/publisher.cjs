@@ -193,6 +193,8 @@ class Publisher {
       const policy = social.me?.sharing;
       if (!policy) throw Error('Mettez le serveur à jour pour configurer le partage des images.');
       const previous = await (await this.request('/api/snapshot')).json();
+      // The server may have pruned derivatives since the last transfer.
+      this.uploaded.clear();
       for (const f of previous?.frames || []) {
         if (f.private) continue;
         if (!f.media && f.available) this.uploaded.add(f.id);
@@ -228,6 +230,32 @@ class Publisher {
         return snapshot;
       };
       const snapshot = fresh();
+      const refreshAvailability = () => {
+        const latest = buildSnapshot(this.recorder.snapshot(), this.auth.since);
+        const current = new Map(latest.frames.map((f) => [f.id, f]));
+        snapshot.frames = snapshot.frames.map((f) => {
+          const privateNow =
+            f.private || current.get(f.id)?.private || hidden(f, this.recorder.data.settings);
+          if (privateNow)
+            return {
+              ...f,
+              private: true,
+              app: 'Données privées',
+              domain: '',
+              category: 'unknown',
+              media: {},
+              available: false,
+            };
+          const media = Object.fromEntries(
+            Object.entries(f.media).map(([key, m]) => [
+              key,
+              { ...m, available: this.uploaded.has(m.id) },
+            ]),
+          );
+          return { ...f, media, available: !!media.profileScreen?.available };
+        });
+        return snapshot;
+      };
       const allowed = new Set(
         snapshot.frames.flatMap((f) => Object.values(f.media || {}).map((m) => m.id)),
       );
@@ -240,57 +268,70 @@ class Publisher {
         });
       // Revoke newly hidden frames before uploading anything else.
       await commit();
-      let sinceCheckpoint = 0;
-      for (const f of [...snapshot.frames].reverse()) {
-        if (!this.recorder.data.settings.shareEnabled) break;
-        if (f.private) continue;
-        for (const [key, m] of Object.entries(f.media)) {
-          if (this.uploaded.has(m.id)) continue;
-          let bytes;
-          try {
-            bytes = await fs.readFile(
-              key.endsWith('Camera')
-                ? this.recorder.cameraPath(f.id)
-                : this.recorder.framePath(f.id),
-            );
-          } catch (e) {
-            if (e.code === 'ENOENT') continue;
-            throw e;
-          }
-          const jpeg = encodeMedia(this.nativeImage, bytes, m.mode, key.endsWith('Camera'), key);
-          // Recheck privacy after asynchronous file/network work.
-          const latest = buildSnapshot(this.recorder.snapshot(), this.auth.since).frames.find(
-            (x) => x.id === f.id,
-          );
-          if (!latest || latest.private) {
-            f.private = true;
-            continue;
-          }
-          await this.request('/api/image/' + m.id, {
+      const jobs = [...snapshot.frames]
+        .reverse()
+        .filter((f) => !f.private)
+        .flatMap((f) =>
+          Object.entries(f.media)
+            .filter(([, m]) => !this.uploaded.has(m.id))
+            .map(([key, m]) => ({ f, key, m })),
+        );
+      for (
+        let offset = 0;
+        offset < jobs.length && this.recorder.data.settings.shareEnabled;
+        offset += 16
+      ) {
+        const batch = jobs.slice(offset, offset + 16);
+        let cursor = 0;
+        const failures = [];
+        await Promise.all(
+          Array.from({ length: 4 }, async () => {
+            while (cursor < batch.length && this.recorder.data.settings.shareEnabled) {
+              const { f, key, m } = batch[cursor++];
+              try {
+                const bytes = await fs.readFile(
+                  key.endsWith('Camera')
+                    ? this.recorder.cameraPath(f.id)
+                    : this.recorder.framePath(f.id),
+                );
+                const jpeg = encodeMedia(
+                  this.nativeImage,
+                  bytes,
+                  m.mode,
+                  key.endsWith('Camera'),
+                  key,
+                );
+                const latest = buildSnapshot(this.recorder.snapshot(), this.auth.since).frames.find(
+                  (x) => x.id === f.id,
+                );
+                if (!latest || latest.private || !this.recorder.data.settings.shareEnabled)
+                  continue;
+                await this.request('/api/image/' + m.id, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'image/jpeg' },
+                  body: jpeg,
+                });
+                this.uploaded.add(m.id);
+              } catch (error) {
+                if (error.code !== 'ENOENT') failures.push(error);
+              }
+            }
+          }),
+        );
+        if (this.recorder.data.settings.shareEnabled)
+          await this.request('/api/snapshot', {
             method: 'PUT',
-            headers: { 'Content-Type': 'image/jpeg' },
-            body: jpeg,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(refreshAvailability()),
           });
-          this.uploaded.add(m.id);
-          if (++sinceCheckpoint >= 16 && this.recorder.data.settings.shareEnabled) {
-            await this.request('/api/snapshot', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(fresh()),
-            });
-            sinceCheckpoint = 0;
-          }
-        }
+        if (failures.length) throw failures[0];
       }
       // Always use fresh masking rules at the end of a transfer.
       if (this.recorder.data.settings.shareEnabled) {
         await this.request('/api/snapshot', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...fresh(),
-            frames: fresh().frames,
-          }),
+          body: JSON.stringify(refreshAvailability()),
         });
         this.lastSync = Date.now();
       }

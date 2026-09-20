@@ -1,11 +1,18 @@
 const { hidden } = require('./share-snapshot.cjs');
 const DAY = 86400000;
-function sample(frames, count) {
+function sample(frames, count, span) {
   if (frames.length <= count) return frames;
-  return Array.from(
-    { length: count },
-    (_, i) => frames[Math.floor((i * (frames.length - 1)) / (count - 1))],
-  );
+  // Absolute time buckets keep existing captures stable as the live day grows.
+  // Index-based sampling replaced almost every derivative on each new frame.
+  const width = Math.ceil(span / (count - 2));
+  const buckets = new Map();
+  for (const frame of frames) {
+    const bucket = Math.floor(frame.at / width);
+    if (!buckets.has(bucket)) buckets.set(bucket, frame);
+  }
+  const selected = [...buckets.values()];
+  if (selected.at(-1)?.id !== frames.at(-1).id) selected.push(frames.at(-1));
+  return selected.slice(-count);
 }
 function selectHistory(frames, now = Date.now()) {
   const sorted = [...new Map(frames.map((f) => [f.id, f])).values()]
@@ -22,6 +29,7 @@ function selectHistory(frames, now = Date.now()) {
       sample(
         sorted.filter((f) => f.at < now - from * DAY && f.at >= now - to * DAY),
         count,
+        (to - from) * DAY,
       ),
     )
     .sort((a, b) => a.at - b.at);
