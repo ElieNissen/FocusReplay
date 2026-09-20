@@ -180,7 +180,13 @@ try {
   await expect(page.getByRole('button', { name: 'Arrêter la lecture', exact: true })).toBeVisible();
   await expect(page.locator('.timestamp span')).not.toHaveText('7 / 24');
   await page.getByRole('button', { name: 'Arrêter la lecture', exact: true }).click();
-  await page.getByRole('slider', { name: 'Vitesse de lecture' }).fill('3');
+  const playbackSpeed = page.getByRole('slider', { name: 'Vitesse de lecture' });
+  await expect(playbackSpeed).toHaveAttribute('min', '4');
+  await expect(playbackSpeed).toHaveAttribute('max', '30');
+  await playbackSpeed.fill('30');
+  await expect(page.locator('.inline-slider output')).toHaveText('30 img/s');
+  await playbackSpeed.fill('4');
+  await expect(page.locator('.inline-slider output')).toHaveText('4 img/s');
   await page.locator('.timeline-scroll').hover();
   await page.mouse.wheel(0, -180);
   await expect
