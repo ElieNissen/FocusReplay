@@ -23,7 +23,7 @@ try {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   const start = new Date().setHours(10, 0, 0, 0);
-  const frames = Array.from({ length: 12 }, (_, i) => ({
+  const frames = Array.from({ length: 400 }, (_, i) => ({
     id: String(i),
     at: start + i * 60000,
     app: 'Éditeur',
@@ -49,7 +49,7 @@ try {
         status: 'recording',
         sessions: [],
         days: [],
-        gaps: [{ from: start + 240000, to: start + 360000, label: 'Pause' }],
+        gaps: [{ from: start + 3600000, to: start + 5400000, label: 'Pause' }],
         overview: [
           { from: start, to: start + 240000, app: 'Éditeur', category: 'work' },
           { from: start + 360000, to: start + 660000, app: 'Navigateur', category: 'unknown' },
@@ -66,7 +66,7 @@ try {
         key,
         new Blob(
           [
-            '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450"><rect width="800" height="450" fill="#34385a"/><text x="50" y="80" fill="white" font-size="28">Session fictive</text></svg>',
+            '<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080"><rect width="1920" height="1080" fill="#34385a"/><text x="50" y="80" fill="white" font-size="28">Session fictive</text></svg>',
           ],
           { type: 'image/svg+xml' },
         ),
@@ -96,19 +96,59 @@ try {
   await page.getByRole('button', { name: 'Pause du replay' }).click();
   await page.getByRole('slider', { name: 'Vitesse de lecture' }).focus();
   await page.keyboard.press('End');
-  assert.equal(await page.getByRole('slider', { name: 'Vitesse de lecture' }).inputValue(), '8');
-  await page.getByRole('slider',{name:'Timeline du replay'}).focus();
+  assert.equal(await page.getByRole('slider', { name: 'Vitesse de lecture' }).inputValue(), '30');
+  await page.getByRole('slider', { name: 'Timeline du replay' }).focus();
   await page.keyboard.press('Home');
-  const began=Date.now();
-  await page.getByRole('button',{name:'Lire le replay',exact:true}).click();
-  await page.getByRole('button',{name:'Pause du replay'}).waitFor();
-  await page.getByRole('button',{name:'Lire le replay',exact:true}).waitFor({timeout:5000});
-  assert.ok(Date.now()-began<4000,'Buffered playback completes 12 frames at 8 fps without per-frame network waits');
-  assert.equal(Number(await page.getByRole('slider',{name:'Timeline du replay'}).inputValue()),frames.at(-1).at);
-  const stableCanvas=await page.locator('.screen > .replay-surface canvas').elementHandle();
-  await page.getByRole('button',{name:'Image précédente'}).click();
-  await page.getByRole('button',{name:'Image suivante'}).click();
-  assert.ok(await stableCanvas.evaluate(el=>el.isConnected),'The preview canvas survives frame changes without remounting');
+  await page.evaluate(() => {
+    window.replayMeasurements = { buffers: 0, times: [] };
+    let buffering = false,
+      last = '';
+    new MutationObserver(() => {
+      const next = !!document.querySelector('.replay-buffer');
+      if (next && !buffering) window.replayMeasurements.buffers++;
+      buffering = next;
+      const text = document.querySelector('.transport > span')?.textContent;
+      if (text !== last) {
+        last = text;
+        window.replayMeasurements.times.push(performance.now());
+      }
+    }).observe(document.querySelector('.replay-workspace') || document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+  });
+  const began = Date.now();
+  await page.getByRole('button', { name: 'Lire le replay', exact: true }).click();
+  await page.getByRole('button', { name: 'Pause du replay' }).waitFor();
+  await page
+    .getByRole('button', { name: 'Lire le replay', exact: true })
+    .waitFor({ timeout: 25000 });
+  assert.ok(
+    Date.now() - began < 22000,
+    'Buffered playback completes 400 frames at 30 fps with 350ms network latency',
+  );
+  assert.equal(
+    Number(await page.getByRole('slider', { name: 'Timeline du replay' }).inputValue()),
+    frames.at(-1).at,
+  );
+  const playbackMs = Date.now() - began;
+  const measurements = await page.evaluate(() => window.replayMeasurements);
+  assert.ok(measurements.buffers <= 1, 'No rebuffering during the long replay');
+  const intervals = measurements.times
+    .slice(2)
+    .map((t, i) => t - measurements.times[i + 1])
+    .sort((a, b) => a - b);
+  const p95 = intervals[Math.floor(intervals.length * 0.95)];
+  assert.ok(p95 < 100, '95% of playback updates stay under 100ms');
+  console.log({ playbackMs, buffers: measurements.buffers, updateP95: p95 });
+  const stableCanvas = await page.locator('.screen > .replay-surface canvas').elementHandle();
+  await page.getByRole('button', { name: 'Image précédente' }).click();
+  await page.getByRole('button', { name: 'Image suivante' }).click();
+  assert.ok(
+    await stableCanvas.evaluate((el) => el.isConnected),
+    'The preview canvas survives frame changes without remounting',
+  );
   await page.locator('.replay-timeline-scroll').hover();
   await page.mouse.wheel(0, -180);
   await page.waitForTimeout(220);
@@ -124,7 +164,7 @@ try {
   await page.mouse.move(strip.x + strip.width * 0.5, strip.y + 20, { steps: 8 });
   await page.mouse.up();
   const seek = Number(await page.getByRole('slider', { name: 'Timeline du replay' }).inputValue());
-  assert.ok(Math.abs(seek - (start + 330000)) < 30000);
+  assert.ok(Math.abs(seek - (start + (399 * 60000) / 2)) < 30000);
   await page.getByRole('slider', { name: 'Zoom de la timeline' }).focus();
   await page.keyboard.press('End');
   await page.waitForTimeout(100);
@@ -149,7 +189,12 @@ try {
     'Yesterday is not preloaded',
   );
   assert.deepEqual(errors, []);
-  console.log('Web replay: keyboard, speed, wheel zoom, camera and pause cells passed.');
+  console.log(
+    '400-frame replay at 30 fps completed in',
+    Date.now() - began,
+    'ms; unique derivatives:',
+    requests.size,
+  );
 } finally {
   await browser?.close();
   server.kill();

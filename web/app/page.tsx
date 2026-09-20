@@ -142,7 +142,7 @@ function Replay({ profile }: { profile: string }) {
     window.addEventListener('resize', resize);
     return () => window.removeEventListener('resize', resize);
   }, []);
-  const [speed, setSpeed] = useState(2),
+  const [speed, setSpeed] = useState(4),
     [zoom, setZoom] = useState(1);
   const timeline = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -183,17 +183,28 @@ function Replay({ profile }: { profile: string }) {
   }
   useEffect(() => {
     refresh();
-    const t = setInterval(refresh, 180000);
+
     document.addEventListener('visibilitychange', refresh);
     return () => {
-      clearInterval(t);
       document.removeEventListener('visibilitychange', refresh);
     };
   }, []);
+  const pendingImages = (data?.frames || []).some(
+    (f: any) => !f.private && f.screenMode !== 'hidden' && f.available === false,
+  );
+  useEffect(() => {
+    if (locked) return;
+    const t = setInterval(refresh, pendingImages ? 15000 : 180000);
+    return () => clearInterval(t);
+  }, [locked, pendingImages]);
   const selectedDay = day === 'today' ? todayKey() : day;
-  const frames = (data?.frames || [])
-    .filter((f: any) => f.day === selectedDay)
-    .sort((a: any, b: any) => a.at - b.at);
+  const frames = useMemo(
+    () =>
+      (data?.frames || [])
+        .filter((f: any) => f.day === selectedDay)
+        .sort((a: any, b: any) => a.at - b.at),
+    [data, selectedDay],
+  );
   const index =
     follow || cursor === null
       ? Math.max(0, frames.length - 1)
@@ -213,7 +224,7 @@ function Replay({ profile }: { profile: string }) {
     node.scrollLeft = Math.max(0, fraction * node.scrollWidth - node.clientWidth / 2);
   }, [zoom]);
   useEffect(() => {
-    if (locked || document.hidden) return;
+    if (locked || playing || document.hidden) return;
     const nearby = frames.slice(Math.max(0, index - 4), index + 49);
     for (const f of nearby)
       if (!f.private) {
@@ -222,7 +233,7 @@ function Replay({ profile }: { profile: string }) {
         if (f.cameraAvailable)
           void cache.load(mediaUrl(f.id, 'camera', f.cameraMode)).catch(() => {});
       }
-  }, [cache, index, data, locked, selectedDay]);
+  }, [cache, index, data, locked, selectedDay, playing]);
   const nearest = (source: string) =>
     frames
       .filter(
@@ -240,12 +251,20 @@ function Replay({ profile }: { profile: string }) {
       .sort((a: any, b: any) => a.distance - b.distance)[0]?.key;
   useEffect(() => {
     if (locked || document.hidden) return;
-    const samples = frames.filter(
-      (_: any, i: number) => i % Math.max(1, Math.ceil(frames.length / 40)) === 0,
-    );
-    for (const f of samples)
-      if (!f.private && f.available !== false)
-        void cache.load(mediaUrl(f.id, 'screen', f.screenMode)).catch(() => {});
+    let active = true;
+    setDayLoading(true);
+    const keys = frames
+      .filter((f: any) => !f.private)
+      .flatMap((f: any) => [
+        ...(f.available !== false ? [mediaUrl(f.id, 'screen', f.screenMode)] : []),
+        ...(f.cameraAvailable ? [mediaUrl(f.id, 'camera', f.cameraMode)] : []),
+      ]);
+    void Promise.allSettled(keys.map((key: string) => cache.load(key))).then(() => {
+      if (active) setDayLoading(false);
+    });
+    return () => {
+      active = false;
+    };
   }, [data, selectedDay, locked, cache]);
   const gap = (data?.gaps || []).find((g: any) => position >= g.from && position < g.to);
   const step = (n: number) => {
@@ -290,27 +309,28 @@ function Replay({ profile }: { profile: string }) {
     };
     void (async () => {
       await fill(current);
+      let deadline = performance.now();
       while (active && current < frames.length - 1) {
         const next = frames[current + 1];
         if (keysFor(next).some((key) => !cache.peek(key) && !attempted.has(key)))
           await fill(current + 1);
         if (!active) break;
+        await Promise.allSettled(
+          keysFor(next)
+            .filter((key) => !attempted.has(key))
+            .map((key) => cache.decoded(key)),
+        );
+        deadline = Math.max(deadline + 1000 / speed, performance.now());
         await new Promise<void>((resolve) => {
-          timer = setTimeout(resolve, 1000 / speed);
+          timer = setTimeout(resolve, Math.max(0, deadline - performance.now()));
         });
-        if (!active) break;
-        await Promise.allSettled(keysFor(next).map((key) => cache.decoded(key)));
         if (!active) break;
         current++;
         setFollow(false);
         setCursor(next.at);
-        for (const f of frames.slice(current + 1, current + 49))
-          for (const key of keysFor(f)) {
-            if (!attempted.has(key))
-              void cache.load(key).catch(() => {
-                attempted.add(key);
-              });
-          }
+        for (const upcoming of frames.slice(current + 1, current + 7))
+          for (const key of keysFor(upcoming))
+            if (!attempted.has(key)) void cache.decoded(key).catch(() => attempted.add(key));
       }
       if (active) setPlaying(false);
     })();
@@ -500,7 +520,7 @@ function Replay({ profile }: { profile: string }) {
                 <Lock />{' '}
                 {frame.screenMode === 'hidden'
                   ? 'Écran masqué par le propriétaire'
-                  : 'Image en attente de synchronisation'}
+                  : 'Capture pas encore envoyée par l’application'}
               </p>
             ) : (
               <ReplaySurface
@@ -655,8 +675,8 @@ function Replay({ profile }: { profile: string }) {
                   Lecture · {speed} img/s
                   <Slider
                     aria-label="Vitesse de lecture"
-                    minValue={1}
-                    maxValue={8}
+                    minValue={4}
+                    maxValue={30}
                     step={1}
                     value={speed}
                     onChange={(v) => setSpeed(Array.isArray(v) ? v[0] : v)}

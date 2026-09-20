@@ -242,6 +242,13 @@ test('live uploads keep their authorization plan stable across checkpoints and r
   assert.ok(checkpoints > 2);
   assert.ok(uploads > 100);
   assert.ok(manifest.frames.every((f) => f.available && objects.has(f.media.profileScreen.id)));
+  const previousUploads = uploads;
+  initialIds = undefined;
+  p.uploaded.clear();
+  await p.sync();
+  assert.equal(p.error, '');
+  assert.ok(uploads - previousUploads <= 2, 'Restart only uploads new derivatives');
+  assert.ok(manifest.frames.every((f) => f.available && objects.has(f.media.profileScreen.id)));
 });
 
 test('one new live capture does not invalidate the archived day selection', () => {
